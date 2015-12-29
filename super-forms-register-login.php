@@ -158,6 +158,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 
                 // Filters since 1.0.0
                 add_filter( 'super_settings_after_smtp_server_filter', array( $this, 'add_settings' ), 10, 2 );
+                add_filter( 'super_email_tags_filter', array( $this, 'add_email_tags' ), 10, 0 );
 
                 // Actions since 1.0.0
                 add_action( 'super_before_load_form_dropdown_hook', array( $this, 'add_ready_to_use_forms' ) );
@@ -212,6 +213,24 @@ if(!class_exists('SUPER_Register_Login')) :
 
 
         /**
+         * Hook into the default email tags and add extra tags that can be used in our Activation email
+         *
+         *  @since      1.0.0
+        */
+        public static function add_email_tags( $tags ) {
+            $tags['register_login_url'] = array(
+                __( 'Retrieves the login page URL', 'super' ),
+                ''
+            );
+            $tags['register_activation_code'] = array(
+                __( 'Retrieves the activation code', 'super' ),
+                ''
+            );
+            return $tags;
+        }
+
+
+        /**
          * Hook into settings and add Register & Login settings
          *
          *  @since      1.0.0
@@ -235,7 +254,7 @@ if(!class_exists('SUPER_Register_Login')) :
                     'register_login_action' => array(
                         'name' => __( 'Actions', 'super' ),
                         'desc' => __( 'Select what this form should do (register or login)?', 'super' ),
-                        'default' => SUPER_Settings::get_value( 0, 'login_user_role', $settings['settings'], '' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_action', $settings['settings'], 'none' ),
                         'filter' => true,
                         'type' => 'select',
                         'values' => array(
@@ -278,6 +297,31 @@ if(!class_exists('SUPER_Register_Login')) :
                             'auto' => __( 'Auto activate and login', 'super' ),
                         ),
                     ),
+                    'register_login_url' => array(
+                        'name' => __( 'Login page URL', 'super' ),
+                        'desc' => __( 'URL of your login page where you placed the login form, here users can activate their account', 'super' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_url', $settings['settings'], get_site_url() . '/login/' ),
+                        'filter' => true,
+                        'parent' => 'register_login_activation',
+                        'filter_value' => 'verify',
+                    ),
+                    'register_activation_subject' => array(
+                        'name' => __( 'Activation Email Subject', 'super' ),
+                        'desc' => __( 'Example: Activate your account', 'super' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_activation_subject', $settings['settings'], 'Activate your account' ),
+                        'filter' => true,
+                        'parent' => 'register_login_activation',
+                        'filter_value' => 'verify',
+                    ),
+                    'register_activation_email' => array(
+                        'name' => __( 'Activation Email Body', 'super' ),
+                        'desc' => __( 'The email message. Use the tag {activation_code} to retrieve the code and {login_url} for the login page.', 'super' ),
+                        'type' => 'textarea',
+                        'default' => SUPER_Settings::get_value( 0, 'register_activation_email', $settings['settings'], "Dear {field_user_login},\n\nThank you for registering! Before you can login you will need to activate your account.\nBelow you will find your activation code. You need this code to activate your account:\n\nActivation Code: <strong>{register_activation_code}</strong>\n\nClick <a href=\"{register_login_url}?code={register_activation_code}\">here</a> to activate your account with the provided code.\n\n\nBest regards,\n\n{option_blogname}" ),
+                        'filter' => true,
+                        'parent' => 'register_login_activation',
+                        'filter_value' => 'verify',
+                    ),                    
                     'register_login_user_meta' => array(
                         'name' => __( 'Save custom user meta', 'super' ),
                         'desc' => __( 'Usefull for external plugins such as WooCommerce. Example: "field_name|meta_key" (each on a new line)', 'super' ),
@@ -309,7 +353,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 
                 // Before we proceed, lets check if we have at least a user_login and user_email field
                 if( ( !isset( $data['user_login'] ) ) && ( !isset( $data['user_email'] ) ) ) {
-                    $msg = __( 'We couldn\'t find the <strong>user_login</strong> and <strong>user_email</strong> fields which are required in order to register a new user. Please <a href="' . get_admin_url() . '/admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super' );
+                    $msg = __( 'We couldn\'t find the <strong>user_login</strong> and <strong>user_email</strong> fields which are required in order to register a new user. Please <a href="' . get_admin_url() . 'admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super' );
                     $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                     SUPER_Common::output_error(
                         $error = true,
@@ -317,196 +361,246 @@ if(!class_exists('SUPER_Register_Login')) :
                         $redirect = null
                     );
                 }
-                /*
-                var_dump('register new user');
-                
 
-                /*
-                $username = sanitize_user( $data['username'] );
-                $email = sanitize_email( $data['email'] );
-                $user_id = username_exists( $username );
-                if ( !$user_id and email_exists( $email ) == false ) {
-                    
-                    // Lets find out if a field could be found with the name "role".
-                    // This allows users to to select their user role by their own.
-                    // Usefull for forms where users can select to be a company or consumer.
-
-                    $role = '';
-                    if( isset( $settings['register_login_action'] ) ) {
-                        $role = $settings['register_login_action'];
-                    }
-                    if( isset( $data['role'] ) ) {
-                        $role = sanitize_text_field( $data['role'] );
-                    }
-
-
-                    register_login_user_meta
-
-
-                    $role = absint( $data['role'] );
-                    $password = $data['password'];
-                    $first_name = sanitize_text_field( $data['first_name'] );
-                    $last_name = sanitize_text_field( $data['last_name'] );
-                    $website =  sanitize_text_field( $data['website'] );
-                    
-                    //$website =  sanitize_text_field( $data['website'] );
-                    //$company_name =  sanitize_text_field( $data['company_name'] );
-                    //$title =  sanitize_text_field( $data['title'] );
-                    //$first_name =  sanitize_text_field( $data['first_name'] );
-                    //$last_name =  sanitize_text_field( $data['last_name'] );
-                    //$phone =  sanitize_text_field( $data['phone'] );
-                    //$mobile =  sanitize_text_field( $data['mobile'] );
-                    //$address =  sanitize_text_field( $data['address'] );
-                    //$zipcode =  sanitize_text_field( $data['zipcode'] );
-                    //$city =  sanitize_text_field( $data['city'] );
-                    //$state =  absint( $data['state'] );
-                    if( $account_type==0 ) {
-                        $role = 'vg_consumer';    
-                    }else{
-                        $role = 'vg_company';
-                    }
-                    $code = wp_generate_password( 8, false );
-                    $user_id = wp_insert_user( 
-                        array(
-                            'user_login' => $username,
-                            'user_email' => $email,
-                            'user_pass' => $password,
-                            'role' => $role,
-                            'show_admin_bar_front' => 'false'
-                            'first_name' => $first_name,
-                            'last_name' => $last_name,
-                            'user_url' => $website,
-                        )
-                    );
-                    if ( ! is_wp_error( $user_id ) ) {
-                        
-                        // Save user meta
-                        $meta_data = array(
-                            
-                            // VeilGarant details
-                            //'vg_title' => $title,
-                            'vg_agreed_to' => 'v'.VG_TERMS_VERSION,
-                            'vg_status' => 0, // 0 = inactive, 1 = active
-                            'vg_activation' => $code,
-                            'vg_reg_completed' => 0, // 0 = incomplete, 1 = completed
-                            
-                            // Billing details
-                            'billing_email' => $email
-
-                            /*
-                            'billing_first_name' => $first_name,
-                            'billing_last_name' => $last_name,
-                            'billing_company' => $company_name,
-                            'billing_address_1' => $address,
-                            'billing_address_2' => '',
-                            'billing_city' => $city,
-                            'billing_postcode' => $zipcode,
-                            'billing_country' => 'NL',
-                            'billing_state' => $state,
-                            'billing_phone' => $phone,
-                            'billing_mobile' => $mobile,
-                            'billing_email' => $email,
-                            
-                            // Shipping details
-                            'shipping_first_name' => $first_name,
-                            'shipping_last_name' => $last_name,
-                            'shipping_company' => $company_name,
-                            'shipping_address_1' => $address,
-                            'shipping_address_2' => '',
-                            'shipping_city' => $city,
-                            'shipping_postcode' => $zipcode,
-                            'shipping_country' => 'NL',
-                            'shipping_state' => $state
-                            */
-
-                        /*
-                        );
-                        foreach($meta_data as $k => $v){
-                            update_user_meta( $user_id, $k, $v ); 
-                        }                        
-                        
-                        $subject = 'Activeer uw account';
-                        $message  = '<body style="margin: 0; padding: 0;">';
-                        $message .= 'Beste ' . $username . ',<br /><br />';
-                        $message .= 'Bedankt voor het registreren op VeilGarant. Voordat u kunt inloggen moet u uw account activeren.<br />';
-                        $message .= 'Hieronder ziet u uw activatie code, deze heeft u nodig om uw account te activeren:<br /><br />';
-                        $message .= 'Activatie Code: <strong>' . $code . '</strong><br /><br />';
-                        $url = get_site_url() . '/inloggen/?code=' . $code;
-                        $message .= 'Klik <a href="' . $url . '">hier</a> om uw account te activeren met de bovenstaande code.<br /><br /><br />';
-                        $message .= 'Indien de link niet werkt kunt u de onderstaande URL kopiëren en in de adres balk van uw browser plakken:<br />';
-                        $message .= '<pre>' . $url . '</pre><br /><br />';
-                        $message .= 'We wensen u veel plezier met uw account op veilgarant.nl!<br /><br /><br />';
-                        $message .= 'Met vriendelijke groet,<br /><br />VeilGarant BV';
-                        $message .= '</body>';
-                        $attachements = array('/htdocs/veilgarant.f4d.nl/public_html/algemene-voorwaarden.pdf' => 'Algemene Voorwaarden');
-                        $send = VG_Common::email( $email, $username, $subject, $message, $attachements );
-                        if (!$send) {    
-                            $msg = "Mailer Error: " . $mail->ErrorInfo;
-                        } else {
-                            $wp_session = WP_Session::get_instance();
-                            $msg = 'Bedankt voor uw registratie, controleer uw email om uw account te activeren. Controleer eventueel ook uw spam.';
-                            $wp_session['veilgarant_msg'] = array( 'msg'=>$msg, 'type'=>'success' );
-                            self::output_error(
-                                $error = false,
-                                $msg = $msg,
-                                $redirect = get_site_url()
-                            );
-                        }
-                    }
-                } else {
-                    self::output_error(
+                // Now lets check if a user already exists with the same user_login or user_email
+                $user_login = sanitize_user( $data['user_login']['value'] );
+                $user_email = sanitize_email( $data['user_email']['value'] );
+                $username_exists = username_exists($user_login);
+                $email_exists = email_exists($user_email);        
+                if( ( $username_exists!=false ) || ( $email_exists!=false ) ) {
+                    $msg = __( 'Username or Email address already exists, please try again', 'super' );
+                    $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
+                    SUPER_Common::output_error(
                         $error = true,
-                        $msg = 'De opgegeven gebruikersnaam of email adres is reeds in gebruik.',
-                        $redirect = null,
-                        $fields = array(
-                            'username' => 'input',
-                            'email' => 'input'
-                        )
+                        $msg = $msg,
+                        $redirect = null
                     );
                 }
-                die();
+
+                // If user_pass field doesn't exist, we can generate one and send it by email to the registered user
+                $send_password = false;
+                if( !isset( $data['user_pass'] ) ) {
+                    $send_password = true;
+                    $password = wp_generate_password();
+                }else{
+                    $password = $data['user_pass']['value'];
+                }
+
+                // Lets gather all data that we need to insert for this user
+                $userdata = array();
+                $userdata['user_login'] = $user_login;
+                $userdata['user_email'] = $user_email;
+                $userdata['user_pass'] = $password;
+                $userdata['role'] = $settings['register_user_role'];
+                $userdata['user_registered'] = date('Y-m-d H:i:s');
+                $userdata['show_admin_bar_front'] = 'false';
+
+                // Also loop through some of the other default user data that WordPress provides us with out of the box
+                $other_userdata = array(
+                    'user_nicename',
+                    'user_url',
+                    'display_name',
+                    'nickname',
+                    'first_name',
+                    'last_name',
+                    'description',
+                    'rich_editing',
+                    'role', // This is in case we have a custom dropdown with the name "role" which allows users to select their own account type/role
+                    'jabber',
+                    'aim',
+                    'yim'
+                );
+                foreach( $other_userdata as $k ) {
+                    if( isset( $data[$k]['value'] ) ) {
+                        $userdata[$k] = $data[$k]['value'];
+                    }
+                }
+
+                // Insert the user and return the user ID
+                $user_id = wp_insert_user( $userdata );
+                if( is_wp_error( $user_id ) ) {
+                    $msg = __( 'Something went wrong while registering your acount, please try again', 'super' );
+                    $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
+                    SUPER_Common::output_error(
+                        $error = true,
+                        $msg = $msg,
+                        $redirect = null
+                    );
+                }
+
+                // Save custom user meta
+                $meta_data = array();
+                $custom_user_meta = explode( "\n", $settings['register_login_user_meta'] );
+                foreach( $custom_user_meta as $k ) {
+                    $field = explode( "|", $k );
+                    if( isset( $data[$field[0]]['value'] ) ) {
+                        $meta_data[$field[1]] = $data[$field[0]]['value'];
+                    }
+                }
+                foreach( $meta_data as $k => $v ) {
+                    update_user_meta( $user_id, $k, $v ); 
+                }
+
+                // Check if we need to send a activation email to this user
+                if( $settings['register_login_activation']=='verify' ) {
+                    $code = wp_generate_password( 8, false );
+                    update_user_meta( $user_id, 'super_account_status', 0 ); // 0 = inactive, 1 = active
+                    update_user_meta( $user_id, 'super_account_activation', $code ); 
+
+                    $subject = $settings['register_activation_subject'];
+                    $message = $settings['register_activation_email'];
 
 
-                */
+                    $subject = __( 'Activate your account', 'super' );
+                    $message  = '<body style="margin: 0; padding: 0;">';
+                    $message .= 'Dear ' . $user_login . ',<br /><br />';
+                    $message .= 'Thank you for registering! Before you can login you will need to activate your account.<br />';
+                    $message .= 'Below you will find your activation code. You need this code to activate your account:<br /><br />';
+                    $message .= 'Activation Code: <strong>' . $code . '</strong><br /><br />';
+                    $url = $settings['register_login_url'] . '?code=' . $code;
+                    $message .= 'Click <a href="' . $url . '">here</a> to activate your account with the provided code.<br /><br /><br />';
+                    $message .= 'Best regards,<br /><br />' . get_option( 'blogname' );
+                    $message .= '</body>';
+                    $send = SUPER_Common::email( $user_email, $user_login, $settings['header_from'], $settings['header_from_name'], $subject, $message, $settings );
+                    if (!$send) {    
+                        $msg = "Mailer Error: " . $mail->ErrorInfo;
+                    } else {
+                        $msg = __( 'Thank you for registering, please check your email to activate your account.', 'super' );
+                        $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'success' );
+                        SUPER_Common::output_error(
+                            $error = false,
+                            $msg = $msg,
+                            $redirect = $settings['register_login_url'] . '?code=--CODE--'
+                        );
+                    }
+                }
+                
+                // Check if we let users automatically login after registering (instant login)
+                if( $settings['register_login_activation']=='auto' ) {
+                    wp_set_current_user( $user_id );
+                    wp_set_auth_cookie( $user_id );
+                    update_user_meta( $user_id, 'super_last_login', time() );
+                }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                // Return success message
+                $msg = __( 'Your account has been created!', 'super' );
+                $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'success' );
+                SUPER_Common::output_error(
+                    $error = false,
+                    $msg = $msg,
+                    $redirect = null
+                );
             }
+
+
             if( $settings['register_login_action']=='login' ) {
+
                 var_dump('login user');
+
             }
-            //die();
+
         }
+
+
+        /** 
+         *  Send email with activation code
+         *
+         *  Generates the random activation code and adds it to the users table during user registration.
+         *
+         *  @since      1.0.0
+        */
+        public static function new_user_notification( $user_id, $notify='', $data=null, $settings=null, $password=null, $method=null, $send_password=false ) {
+
+            global $wpdb, $wp_hasher;
+            
+            do_action( 'super_before_new_user_notifcation_hook' );
+
+            // Generate a code and save it for the user
+            $code = wp_generate_password( 8 );
+            $wpdb->update(
+                $wpdb->users,
+                array(
+                    'super_activation_code' => $code,
+                    'super_user_status' => '0'
+                ),
+                array(
+                    'ID' => $user_id
+                )
+            );
+            $user = get_userdata( $user_id );
+            $user_login = $user->user_login; 
+            $user_email = $user->user_email;
+
+            do_action( 'super_after_new_user_notifcation_hook' );
+
+
+            /*
+            $message = '';
+            if( $method=='resend' ) {
+                $code = wp_generate_password( 8 );
+                $wpdb->update( $wpdb->users, array( 'super_activation_code' => $code, 'super_user_status' => '0' ), array( 'ID' => $user_id ) );
+                $user = get_userdata( $user_id );
+                $user_login = stripslashes( $user->user_login ); 
+                $user_email = stripslashes( $user->user_email );
+                $settings = get_option( 'super_settings' );
+                $settings['header_additional'] = '';
+                $message = '<body style="margin: 0; padding: 0;">';
+                $message .= __( 'Activation Code:', 'super' ) . ' <strong>' . $code . '</strong><br /><br />'; 
+                $url = network_site_url( 'wp-login.php?super_code=' . urlencode( $code ), 'login' );
+                $message .= __( 'Click', 'super' ) . ' <a href="' . $url . '">' . __( 'here', 'super' ) . '</a> ' . __( 'to activate your account.', 'super' ) . '<br /><br /><br />';
+                $message .= __( 'In case the link doesn\'t work, copy the following URL and paste it in your browsers address bar:' ) . '<br />';
+                $message .= '<pre>' . ( wp_login_url() . '?super_code=' . urlencode( $code ) ) . '</pre>';
+                $message .= '</body>';
+                $message = apply_filters( 'super_resend_activation_link_message_filter', $message, $user_login, $user_email, $code );
+                $settings['confirm_body'] = $message;
+                $settings['confirm_to'] = $user_email;
+                $settings['confirm_subject'] = apply_filters( 'super_resend_activation_subject_filter', sprintf( __( '[%s] Verify your account', 'super' ), get_option( 'blogname' ) ), $user_login, $user_email, $code );
+                $settings['send'] = 'no';
+                $settings['confirm'] = 'yes';
+                $settings['save_contact_entry'] = 'no';
+                tdfb_send_email( $settings );
+            }else{
+                $code = wp_generate_password( 8, false, false );
+                $wpdb->update( $wpdb->users, array( 'super_activation_code' => $code, 'super_user_status' => '0' ), array( 'ID' => $user_id ) );
+                $user = get_userdata( $user_id );
+                $obj = SUPER_Register_Login();
+                $user_login = stripslashes($user->user_login); 
+                $user_email = stripslashes($user->user_email);
+                $key = $password;
+                do_action( 'retrieve_password_key', $user->user_login, $key );
+                if ( empty( $wp_hasher ) ) {
+                    require_once ABSPATH . WPINC . '/class-phpass.php';
+                    $wp_hasher = new PasswordHash( 8, true );
+                }
+                $hashed = time() . ':' . $wp_hasher->HashPassword( $key );
+                $wpdb->update( $wpdb->users, array( 'user_activation_key' => $hashed ), array( 'user_login' => $user->user_login ) );
+                if($send_password) $message .= __( 'Password:', 'super' ).' <strong>'.$password.'</strong><br /><br />';
+                $message .= __( 'Activation Code:', 'super' ).' <strong>'.$code.'</strong><br /><br />'; 
+                $url = network_site_url( 'wp-login.php?super_code='.urlencode( $code ), 'login');
+                $message .= __( 'Click', 'super' ).' <a href="'.$url.'">'.__( 'here', 'super' ).'</a> '.__( 'to activate your account.', 'super' ).'<br /><br /><br />';
+                $message .= __( 'In case the link doesn\'t work, copy the following URL and paste it in your browsers address bar:' ) . '<br />';
+                $message .= '<pre>'.(wp_login_url().'?super_code='.urlencode( $code )).'</pre>';
+                if ( ( $notify=='both' ) || ( $notify=='user' ) ) {
+                    $obj->confirm = 'yes';
+                    $obj->confirm_body = $message;
+                    $obj->confirm_to = $user->user_email;
+                }
+                if ( ( $notify=='both' ) || ( $notify=='admin' ) ) {
+                    $blogname = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+                    $message  = sprintf( __( 'New user registration on your site %s:' ), $blogname ) . "<br /><br />";
+                    $message .= sprintf( __( 'Username: %s' ), $user->user_login ) . "<br /><br />";
+                    $message .= sprintf( __( 'E-mail: %s' ), $user->user_email ) . "<br /><br />";
+                    $obj->send = 'yes';
+                    $obj->email_body = $message;
+                }
+                add_filter( 'tdfb_before_sending_email_settings_filter', array( $obj, 'update_confirm_settings' ) );
+            }
+            */
+
+                        
+        
+        }
+
     }
         
 endif;
