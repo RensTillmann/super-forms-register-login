@@ -143,16 +143,17 @@ if(!class_exists('SUPER_Register_Login')) :
         private function init_hooks() {
             
             // Filters since 1.0.0
-
-            // Actions since 1.0.0
             add_filter( 'super_shortcodes_after_form_elements_filter', array( $this, 'add_activation_code_element' ), 10, 2 );
 
+            // Actions since 1.0.0
+            add_action( 'wp_ajax_super_resend_activation', array( $this, 'resend_activation' ) );
+            
             if ( $this->is_request( 'frontend' ) ) {
                 
                 // Filters since 1.0.0
 
                 // Actions since 1.0.0
-                add_action( 'super_before_output_message', array( $this, 'resend_activation_code_script' ) );
+                add_action( 'super_before_printing_message', array( $this, 'resend_activation_code_script' ) );
 
             }
             
@@ -186,11 +187,12 @@ if(!class_exists('SUPER_Register_Login')) :
          *  @since      1.0.0
         */
         public static function resend_activation_code_script( $data ) {
+            $settings = get_option( 'super_settings' );
             $suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
             $handle = 'super-register-common';
             $name = str_replace( '-', '_', $handle ) . '_i18n';
             wp_register_script( $handle, plugin_dir_url( __FILE__ ) . 'assets/js/frontend/common' . $suffix . '.js', array( 'jquery' ), '1.0', false );  
-            wp_localize_script( $handle, $name, array( 'ajaxurl'=>SUPER_Forms()->ajax_url() ) );
+            wp_localize_script( $handle, $name, array( 'ajaxurl'=>SUPER_Forms()->ajax_url(), 'duration'=>absint( $settings['form_duration'] ) ) );
             wp_enqueue_script( $handle );
         }
 
@@ -406,7 +408,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_login_url', $settings['settings'], get_site_url() . '/login/' ),
                         'filter' => true,
                         'parent' => 'register_login_action',
-                        'filter_value' => 'register',
+                        'filter_value' => 'register,login',
                     ),
                     'register_activation_subject' => array(
                         'name' => __( 'Activation Email Subject', 'super' ),
@@ -414,7 +416,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_activation_subject', $settings['settings'], 'Activate your account' ),
                         'filter' => true,
                         'parent' => 'register_login_action',
-                        'filter_value' => 'register',
+                        'filter_value' => 'register,login',
                     ),
                     'register_activation_email' => array(
                         'name' => __( 'Activation Email Body', 'super' ),
@@ -423,7 +425,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_activation_email', $settings['settings'], "Dear {field_user_login},\n\nThank you for registering! Before you can login you will need to activate your account.\nBelow you will find your activation code. You need this code to activate your account:\n\nActivation Code: <strong>{register_activation_code}</strong>\n\nClick <a href=\"{register_login_url}?code={register_activation_code}\">here</a> to activate your account with the provided code.\n\n\nBest regards,\n\n{option_blogname}" ),
                         'filter' => true,
                         'parent' => 'register_login_action',
-                        'filter_value' => 'register',
+                        'filter_value' => 'register,login',
                     ),                    
                     'register_login_user_meta' => array(
                         'name' => __( 'Save custom user meta', 'super' ),
@@ -449,11 +451,12 @@ if(!class_exists('SUPER_Register_Login')) :
         public static function before_sending_email( $atts ) {
             $data = $atts['post']['data'];
             $settings = $atts['settings'];
+            
             if( !isset( $settings['register_login_action'] ) ) return true;
             if( $settings['register_login_action']=='none' ) return true;
 
             if( $settings['register_login_action']=='register' ) {
-                
+
                 // Before we proceed, lets check if we have at least a user_login and user_email field
                 if( ( !isset( $data['user_login'] ) ) && ( !isset( $data['user_email'] ) ) ) {
                     $msg = __( 'We couldn\'t find the <strong>user_login</strong> and <strong>user_email</strong> fields which are required in order to register a new user. Please <a href="' . get_admin_url() . 'admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super' );
@@ -606,14 +609,22 @@ if(!class_exists('SUPER_Register_Login')) :
                 $creds['user_password'] = $password;
                 $creds['remember'] = true;
                 $user = wp_signon( $creds, false );
-                if(!is_wp_error($user)){
+                if( !is_wp_error( $user ) ) {
                     $user_id = $user->ID;
                     $user = get_user_by( 'id', $user_id );
                     if( $user ) {
+
+                        // First check if the user role is allowed to login
+                        var_dump($user);
+                        var_dump($settings);
+                        var_dump($settings['login_user_role']);
+                        die();
+
+
                         $activated = null;
                         $status = get_user_meta( $user_id, 'super_account_status', true ); // 0 = inactive, 1 = active
                         if( ( !isset( $data['activation_code'] ) ) && ( $status==0 ) ) {
-                            $msg = sprintf( __( 'You haven\'t activated your account yet. Please check your email. Click <a href="#" class="resend-code" data-user="' . $username . '">here</a> to resend your activation email.', 'super' ), $user->user_login );
+                            $msg = sprintf( __( 'You haven\'t activated your account yet. Please check your email or click <a href="#" class="resend-code" data-form="' . absint( $atts['post']['form_id'] ) . '" data-user="' . $username . '">here</a> to resend your activation email.', 'super' ), $user->user_login );
                             $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                             SUPER_Common::output_error(
                                 $error = true,
@@ -623,7 +634,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         }
                         if( isset( $data['activation_code'] ) ) {    
                             if( $status==0 ) {
-                                $code = sanitize_text_field( $data['activation_code'] );
+                                $code = sanitize_text_field( $data['activation_code']['value'] );
                                 $activation = get_user_meta( $user_id, 'super_account_activation', true );
                                 if( $code==$activation ) {
                                     update_user_meta( $user_id, 'super_account_status', 1 ); // 0 = inactive, 1 = active
@@ -632,6 +643,9 @@ if(!class_exists('SUPER_Register_Login')) :
                                 }else{
                                     $activated = false;
                                 }
+                            }
+                            if( $status==1 ) {
+                                $activated = true;
                             }
                         }
                         $msg = sprintf( __( 'Welcome back %s!', 'super' ), $user->user_login );
@@ -675,6 +689,63 @@ if(!class_exists('SUPER_Register_Login')) :
                 }
             }
 
+        }
+
+
+        /** 
+         *  Resend activation code
+         *
+         *  @since      1.0.0
+        */
+        public static function resend_activation() {
+            
+            $data = $_REQUEST['data'];
+            $username = sanitize_user( $data['username'] );
+            $form = absint( $data['form'] );
+            $user = get_user_by( 'login', $username );
+            if( $user ) {
+                $to = $user->user_email;
+                $name = $user->display_name;
+                $code = wp_generate_password( 8, false );
+                $password = wp_generate_password();
+                $user_id = wp_update_user( array( 'ID' => $user->ID, 'user_pass' => 'stropdas' ) );
+                update_user_meta( $user->ID, 'super_account_activation', $code );
+                
+                // Get the form settings, so we can setup the correct email message and subject
+                $settings = get_post_meta( $form, '_super_form_settings', true );
+
+                // Replace email tags with correct data
+                $subject = SUPER_Common::email_tags( $settings['register_activation_subject'], $data, $settings );
+                $message = $settings['register_activation_email'];
+                $message = str_replace( '{field_user_login}', $username, $message );
+                $message = str_replace( '{register_login_url}', $settings['register_login_url'], $message );
+                $message = str_replace( '{register_activation_code}', $code, $message );
+                $message = str_replace( '{register_generated_password}', $password, $message );
+                $message = SUPER_Common::email_tags( $message, $data, $settings );
+                $message = nl2br( $message );
+                $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings );
+                $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings );
+
+                // Send the email
+                $mail = SUPER_Common::email( $to, $from, $from_name, '', '', $subject, $message, $settings );
+
+                // Return message
+                if( !empty( $mail->ErrorInfo ) ) {
+                    SUPER_Common::output_error(
+                        $error = true,
+                        $msg = $mail->ErrorInfo,
+                        $redirect = null
+                    );
+                }else{
+                    $msg = __( 'We have send you a new activation code, check your email to activate your account!', 'super' );
+                    SUPER_Common::output_error(
+                        $error = false,
+                        $msg = $msg,
+                        $redirect = null
+                    );                    
+                }
+            }
+            die();
         }
 
 
