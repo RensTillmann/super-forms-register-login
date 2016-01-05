@@ -410,6 +410,30 @@ if(!class_exists('SUPER_Register_Login')) :
                         'parent' => 'register_login_action',
                         'filter_value' => 'register,login',
                     ),
+                    'register_welcome_back_msg' => array(
+                        'name' => __( 'Welcome back message', 'super' ),
+                        'desc' => __( 'Display a welcome message after user has logged in (leave blank for no message)', 'super' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_welcome_back_msg', $settings['settings'], __( 'Welcome back {field_user_login}!', 'super' ) ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'login',
+                    ),
+                    'register_incorrect_code_msg' => array(
+                        'name' => __( 'Incorrect activation code message', 'super' ),
+                        'desc' => __( 'Display a message when the activation code is incorrect', 'super' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_incorrect_code_msg', $settings['settings'], __( 'The combination username, password and activation code is incorrect!', 'super' ) ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'login',
+                    ),
+                    'register_account_activated_msg' => array(
+                        'name' => __( 'Account activated message', 'super' ),
+                        'desc' => __( 'Display a message when account has been activated', 'super' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_account_activated_msg', $settings['settings'], __( 'Hello {field_user_login}, your account has been activated!', 'super' ) ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'login',
+                    ),
                     'register_activation_subject' => array(
                         'name' => __( 'Activation Email Subject', 'super' ),
                         'desc' => __( 'Example: Activate your account', 'super' ),
@@ -615,12 +639,25 @@ if(!class_exists('SUPER_Register_Login')) :
                     if( $user ) {
 
                         // First check if the user role is allowed to login
-                        var_dump($user);
-                        var_dump($settings);
-                        var_dump($settings['login_user_role']);
-                        die();
+                        $allowed = false;
+                        if( ( !isset( $settings['login_user_role'] ) ) || ( $settings['login_user_role']=='' ) ) {
+                            $allowed = true;
+                        }else{
+                            $allowed = in_array( $user->roles[0], $settings['login_user_role'] );
+                            if( in_array( '', $settings['login_user_role'] ) ) {
+                                $allowed = true;
+                            }
+                        }
+                        if( $allowed != true ) {
+                            $msg = __( 'You are not allowed to login!', 'super' );
+                            SUPER_Common::output_error(
+                                $error = true,
+                                $msg = $msg,
+                                $redirect = null
+                            );
+                        }
 
-
+                        // Check if user has not activated their account yet
                         $activated = null;
                         $status = get_user_meta( $user_id, 'super_account_status', true ); // 0 = inactive, 1 = active
                         if( ( !isset( $data['activation_code'] ) ) && ( $status==0 ) ) {
@@ -632,6 +669,8 @@ if(!class_exists('SUPER_Register_Login')) :
                                 $redirect = $settings['register_login_url'] . '?code=[%20CODE%20]&user=' . $username
                             );
                         }
+
+                        // Validate the activation code
                         if( isset( $data['activation_code'] ) ) {    
                             if( $status==0 ) {
                                 $code = sanitize_text_field( $data['activation_code']['value'] );
@@ -648,18 +687,21 @@ if(!class_exists('SUPER_Register_Login')) :
                                 $activated = true;
                             }
                         }
-                        $msg = sprintf( __( 'Welcome back %s!', 'super' ), $user->user_login );
+                        $msg = '';
+                        if( ( isset( $settings['register_welcome_back_msg'] ) ) && ( $settings['register_welcome_back_msg']!='' ) ) {
+                            $msg = SUPER_Common::email_tags( $settings['register_welcome_back_msg'], $data, $settings );
+                        }
                         $error = false;
                         $redirect = get_site_url();
                         if( $activated!=false ) {
                             if( $activated==false ) {
-                                $msg = sprintf( __( 'The combination username, password and activation code is incorrect!', 'super' ), $user->user_login );
+                                $msg = SUPER_Common::email_tags( $settings['register_incorrect_code_msg'], $data, $settings );
                                 $error = true;
                                 $redirect = null;
                             }else{
                                 wp_set_current_user($user_id);
                                 wp_set_auth_cookie($user_id);
-                                $msg = sprintf( __( 'Hello %s, your account has been activated!', 'super' ), $user->user_login );
+                                $msg = SUPER_Common::email_tags( $settings['register_account_activated_msg'], $data, $settings );
                             }
                         }else{
                             wp_set_current_user($user_id);
