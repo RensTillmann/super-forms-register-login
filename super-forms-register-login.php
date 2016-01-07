@@ -366,6 +366,7 @@ if(!class_exists('SUPER_Register_Login')) :
                             'none' => __( 'None (do nothing)', 'super' ),
                             'register' => __( 'Register a new user', 'super' ),
                             'login' => __( 'Login (user will be logged in)', 'super' ),
+                            'reset_password' => __( 'Reset password (lost password)', 'super' ),
                         ),
                     ),
                     'login_user_role' => array(
@@ -408,7 +409,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_login_url', $settings['settings'], get_site_url() . '/login/' ),
                         'filter' => true,
                         'parent' => 'register_login_action',
-                        'filter_value' => 'register,login',
+                        'filter_value' => 'register,login,reset_password',
                     ),
                     'register_welcome_back_msg' => array(
                         'name' => __( 'Welcome back message', 'super' ),
@@ -437,20 +438,20 @@ if(!class_exists('SUPER_Register_Login')) :
                     'register_activation_subject' => array(
                         'name' => __( 'Activation Email Subject', 'super' ),
                         'desc' => __( 'Example: Activate your account', 'super' ),
-                        'default' => SUPER_Settings::get_value( 0, 'register_activation_subject', $settings['settings'], 'Activate your account' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_activation_subject', $settings['settings'], __( 'Activate your account', 'super' ) ),
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'register,login',
                     ),
                     'register_activation_email' => array(
                         'name' => __( 'Activation Email Body', 'super' ),
-                        'desc' => __( 'The email message. Use the tag {activation_code} to retrieve the code and {login_url} for the login page.', 'super' ),
+                        'desc' => __( 'The email message. You can use {activation_code} and {register_login_url}', 'super' ),
                         'type' => 'textarea',
                         'default' => SUPER_Settings::get_value( 0, 'register_activation_email', $settings['settings'], "Dear {field_user_login},\n\nThank you for registering! Before you can login you will need to activate your account.\nBelow you will find your activation code. You need this code to activate your account:\n\nActivation Code: <strong>{register_activation_code}</strong>\n\nClick <a href=\"{register_login_url}?code={register_activation_code}\">here</a> to activate your account with the provided code.\n\n\nBest regards,\n\n{option_blogname}" ),
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'register,login',
-                    ),                    
+                    ),                                      
                     'register_login_user_meta' => array(
                         'name' => __( 'Save custom user meta', 'super' ),
                         'desc' => __( 'Usefull for external plugins such as WooCommerce. Example: "field_name|meta_key" (each on a new line)', 'super' ),
@@ -460,7 +461,39 @@ if(!class_exists('SUPER_Register_Login')) :
                         'parent' => 'register_login_action',
                         'filter_value' => 'register',
                     ),
-
+                    'register_reset_password_success_msg' => array(
+                        'name' => __( 'Success message', 'super' ),
+                        'desc' => __( 'Display a message after user has reset their password (leave blank for no message)', 'super' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_reset_password_success_msg', $settings['settings'], __( 'Your password has been reset. We have just send you a new password to your email address.', 'super' ) ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'reset_password',
+                    ),
+                    'register_reset_password_not_exists_msg' => array(
+                        'name' => __( 'Not found message', 'super' ),
+                        'desc' => __( 'Display a message when no user was found (leave blank for no message)', 'super' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_reset_password_not_exists_msg', $settings['settings'], __( 'We couldn\'t find a user with the given email address!', 'super' ) ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'reset_password',
+                    ),
+                    'register_reset_password_subject' => array(
+                        'name' => __( 'Lost Password Email Subject', 'super' ),
+                        'desc' => __( 'Example: Your new password. You can use {user_login}', 'super' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_reset_password_subject', $settings['settings'], __( 'Your new password', 'super' ) ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'reset_password',
+                    ),
+                    'register_reset_password_email' => array(
+                        'name' => __( 'Lost Password Email Body', 'super' ),
+                        'desc' => __( 'The email message. You can use {user_login}, {register_generated_password} and {register_login_url}', 'super' ),
+                        'type' => 'textarea',
+                        'default' => SUPER_Settings::get_value( 0, 'register_reset_password_email', $settings['settings'], "Dear {user_login},\n\nYou just requested to reset your password.\nUsername: <strong>{user_login}</strong>\nPassword: <strong>{register_generated_password}</strong>\n\nClick <a href=\"{register_login_url}\">here</a> to login with your new password.\n\n\nBest regards,\n\n{option_blogname}" ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'reset_password',
+                    ),
                 )
             );
             return $array;
@@ -484,7 +517,6 @@ if(!class_exists('SUPER_Register_Login')) :
                 // Before we proceed, lets check if we have at least a user_login and user_email field
                 if( ( !isset( $data['user_login'] ) ) && ( !isset( $data['user_email'] ) ) ) {
                     $msg = __( 'We couldn\'t find the <strong>user_login</strong> and <strong>user_email</strong> fields which are required in order to register a new user. Please <a href="' . get_admin_url() . 'admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super' );
-                    $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                     SUPER_Common::output_error(
                         $error = true,
                         $msg = $msg,
@@ -580,17 +612,18 @@ if(!class_exists('SUPER_Register_Login')) :
                     $code = wp_generate_password( 8, false );
                     update_user_meta( $user_id, 'super_account_status', 0 ); // 0 = inactive, 1 = active
                     update_user_meta( $user_id, 'super_account_activation', $code ); 
+                    $user = get_user_by( 'id', $user_id );
 
                     // Replace email tags with correct data
-                    $subject = SUPER_Common::email_tags( $settings['register_activation_subject'], $data, $settings );
+                    $subject = SUPER_Common::email_tags( $settings['register_activation_subject'], $data, $settings, $user );
                     $message = $settings['register_activation_email'];
                     $message = str_replace( '{register_login_url}', $settings['register_login_url'], $message );
                     $message = str_replace( '{register_activation_code}', $code, $message );
                     $message = str_replace( '{register_generated_password}', $password, $message );
-                    $message = SUPER_Common::email_tags( $message, $data, $settings );
+                    $message = SUPER_Common::email_tags( $message, $data, $settings, $user );
                     $message = nl2br( $message );
-                    $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings );
-                    $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings );
+                    $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings, $user );
+                    $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings, $user );
 
                     // Send the email
                     $mail = SUPER_Common::email( $user_email, $from, $from_name, '', '', $subject, $message, $settings );
@@ -619,7 +652,6 @@ if(!class_exists('SUPER_Register_Login')) :
                 // Before we proceed, lets check if we have at least a user_login or user_email and user_pass field
                 if( ( !isset( $data['user_login'] ) ) && ( !isset( $data['user_pass'] ) ) ) {
                     $msg = __( 'We couldn\'t find the <strong>user_login</strong> or <strong>user_pass</strong> fields which are required in order to login a new user. Please <a href="' . get_admin_url() . 'admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super' );
-                    $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                     SUPER_Common::output_error(
                         $error = true,
                         $msg = $msg,
@@ -689,19 +721,19 @@ if(!class_exists('SUPER_Register_Login')) :
                         }
                         $msg = '';
                         if( ( isset( $settings['register_welcome_back_msg'] ) ) && ( $settings['register_welcome_back_msg']!='' ) ) {
-                            $msg = SUPER_Common::email_tags( $settings['register_welcome_back_msg'], $data, $settings );
+                            $msg = SUPER_Common::email_tags( $settings['register_welcome_back_msg'], $data, $settings, $user );
                         }
                         $error = false;
                         $redirect = get_site_url();
                         if( $activated!=false ) {
                             if( $activated==false ) {
-                                $msg = SUPER_Common::email_tags( $settings['register_incorrect_code_msg'], $data, $settings );
+                                $msg = SUPER_Common::email_tags( $settings['register_incorrect_code_msg'], $data, $settings, $user );
                                 $error = true;
                                 $redirect = null;
                             }else{
                                 wp_set_current_user($user_id);
                                 wp_set_auth_cookie($user_id);
-                                $msg = SUPER_Common::email_tags( $settings['register_account_activated_msg'], $data, $settings );
+                                $msg = SUPER_Common::email_tags( $settings['register_account_activated_msg'], $data, $settings, $user );
                             }
                         }else{
                             wp_set_current_user($user_id);
@@ -731,6 +763,78 @@ if(!class_exists('SUPER_Register_Login')) :
                 }
             }
 
+            if( $settings['register_login_action']=='reset_password' ) {
+   
+                // Before we proceed, lets check if we have at least a user_email field
+                if( !isset( $data['user_email'] ) ) {
+                    $msg = __( 'We couldn\'t find the <strong>user_email</strong> field which is required in order to reset passwords. Please <a href="' . get_admin_url() . 'admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super' );
+                    SUPER_Common::output_error(
+                        $error = true,
+                        $msg = $msg,
+                        $redirect = null
+                    );
+                }
+
+                // Sanitize the user email address
+                $user_email = sanitize_email( $data['user_email']['value'] );
+                
+                // Try to find a user with this email address
+                $user = get_user_by( 'email', $user_email );
+                $msg = '';
+                if( !$user ) {
+                    if( ( isset( $settings['register_reset_password_not_exists_msg'] ) ) && ( $settings['register_reset_password_not_exists_msg']!='' ) ) {
+                        $msg = SUPER_Common::email_tags( $settings['register_reset_password_not_exists_msg'], $data, $settings, $user );
+                    }
+                    SUPER_Common::output_error(
+                        $error = true,
+                        $msg = $msg,
+                        $redirect = null
+                    );
+                }
+
+                // Disable the default lost password emails
+                add_filter( 'send_password_change_email', '__return_false' );
+
+                // Generate a new password for this user
+                $password = wp_generate_password( 8, false );
+                
+                // Update the new password for this user
+                $user_id = wp_update_user( array( 'ID' => $user->ID, 'user_pass' => $password ) );
+
+                // Replace the email subject tags with the correct data
+                $subject = SUPER_Common::email_tags( $settings['register_reset_password_subject'], $data, $settings, $user );
+
+                // Replace the email body tags with the correct data
+                $message = $settings['register_reset_password_email'];
+                $message = str_replace( '{register_login_url}', $settings['register_login_url'], $message );
+                $message = str_replace( '{register_generated_password}', $password, $message );
+                $message = SUPER_Common::email_tags( $message, $data, $settings, $user );
+                $message = nl2br( $message );
+                $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings, $user );
+                $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings, $user );
+
+                // Send the email
+                $mail = SUPER_Common::email( $user_email, $from, $from_name, '', '', $subject, $message, $settings );
+
+                // Return message
+                if( !empty( $mail->ErrorInfo ) ) {
+                    SUPER_Common::output_error(
+                        $error = true,
+                        $msg = $mail->ErrorInfo,
+                        $redirect = null
+                    );
+                }else{
+                    $msg = '';
+                    if( ( isset( $settings['register_reset_password_success_msg'] ) ) && ( $settings['register_reset_password_success_msg']!='' ) ) {
+                        $msg = SUPER_Common::email_tags( $settings['register_reset_password_success_msg'], $data, $settings );
+                    }
+                    SUPER_Common::output_error(
+                        $error = false,
+                        $msg = $msg,
+                        $redirect = null
+                    );                    
+                }
+            }
         }
 
 
