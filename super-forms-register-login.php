@@ -147,6 +147,7 @@ if(!class_exists('SUPER_Register_Login')) :
 
             // Actions since 1.0.0
             add_action( 'wp_ajax_super_resend_activation', array( $this, 'resend_activation' ) );
+            add_action( 'wp_ajax_nopriv_super_resend_activation', array( $this, 'resend_activation' ) );
             
             if ( $this->is_request( 'frontend' ) ) {
                 
@@ -391,7 +392,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'values' => $reg_roles,
                     ),
                     'register_login_activation' => array(
-                        'name' => __( 'Send activation link', 'super' ),
+                        'name' => __( 'Send activation email', 'super' ),
                         'desc' => __( 'Optionally let users activate their account or let them instantly login without verification', 'super' ),
                         'type' => 'select',
                         'default' => SUPER_Settings::get_value( 0, 'register_login_activation', $settings['settings'], 'verify' ),
@@ -399,7 +400,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'parent' => 'register_login_action',
                         'filter_value' => 'register',
                         'values' => array(
-                            'verify' => __( 'Send activation link', ' super' ),
+                            'verify' => __( 'Send activation email', ' super' ),
                             'auto' => __( 'Auto activate and login', 'super' ),
                         ),
                     ),
@@ -681,6 +682,7 @@ if(!class_exists('SUPER_Register_Login')) :
                             }
                         }
                         if( $allowed != true ) {
+                            wp_logout();
                             $msg = __( 'You are not allowed to login!', 'super' );
                             SUPER_Common::output_error(
                                 $error = true,
@@ -693,6 +695,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         $activated = null;
                         $status = get_user_meta( $user_id, 'super_account_status', true ); // 0 = inactive, 1 = active
                         if( ( !isset( $data['activation_code'] ) ) && ( $status==0 ) ) {
+                            wp_logout();
                             $msg = sprintf( __( 'You haven\'t activated your account yet. Please check your email or click <a href="#" class="resend-code" data-form="' . absint( $atts['post']['form_id'] ) . '" data-user="' . $username . '">here</a> to resend your activation email.', 'super' ), $user->user_login );
                             $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                             SUPER_Common::output_error(
@@ -724,9 +727,19 @@ if(!class_exists('SUPER_Register_Login')) :
                             $msg = SUPER_Common::email_tags( $settings['register_welcome_back_msg'], $data, $settings, $user );
                         }
                         $error = false;
+
                         $redirect = get_site_url();
+                        if( !empty( $settings['form_redirect_option'] ) ) {
+                            if( $settings['form_redirect_option']=='page' ) {
+                                $redirect = get_permalink( $settings['form_redirect_page'] );
+                            }
+                            if( $settings['form_redirect_option']=='custom' ) {
+                                $redirect = $settings['form_redirect'];
+                            }
+                        }
                         if( $activated!=false ) {
                             if( $activated==false ) {
+                                wp_logout();
                                 $msg = SUPER_Common::email_tags( $settings['register_incorrect_code_msg'], $data, $settings, $user );
                                 $error = true;
                                 $redirect = null;
@@ -747,6 +760,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         );
                     }
                 }else{
+                    wp_logout();
                     if( count( $user->errors ) > 0 ) {
                         $errors = $user->errors;
                         $errors = array_values( $errors );
