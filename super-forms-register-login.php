@@ -192,7 +192,7 @@ if(!class_exists('SUPER_Register_Login')) :
             $suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
             $handle = 'super-register-common';
             $name = str_replace( '-', '_', $handle ) . '_i18n';
-            wp_register_script( $handle, plugin_dir_url( __FILE__ ) . 'assets/js/frontend/common' . $suffix . '.js', array( 'jquery' ), '1.0', false );  
+            wp_register_script( $handle, plugin_dir_url( __FILE__ ) . 'assets/js/frontend/common' . $suffix . '.js', array( 'jquery' ), SUPER_VERSION, false );  
             wp_localize_script( $handle, $name, array( 'ajaxurl'=>SUPER_Forms()->ajax_url(), 'duration'=>absint( $settings['form_duration'] ) ) );
             wp_enqueue_script( $handle );
         }
