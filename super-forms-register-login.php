@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.0.0
+ * Version:     1.0.1
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *	@since		1.0.0
         */
-        public $version = '1.0.0';
+        public $version = '1.0.1';
 
         
         /**
@@ -694,7 +694,8 @@ if(!class_exists('SUPER_Register_Login')) :
                         // Check if user has not activated their account yet
                         $activated = null;
                         $status = get_user_meta( $user_id, 'super_account_status', true ); // 0 = inactive, 1 = active
-                        if( ( !isset( $data['activation_code'] ) ) && ( $status==0 ) ) {
+                        // Maybe this user was already registered before Super Forms was used, if so skip the test
+                        if( ( !isset( $data['activation_code'] ) ) && ( $status==0 ) && ( $status!='' ) ) {
                             wp_logout();
                             $msg = sprintf( __( 'You haven\'t activated your account yet. Please check your email or click <a href="#" class="resend-code" data-form="' . absint( $atts['post']['form_id'] ) . '" data-user="' . $username . '">here</a> to resend your activation email.', 'super' ), $user->user_login );
                             $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
