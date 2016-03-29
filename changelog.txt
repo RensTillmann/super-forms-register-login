@@ -1,2 +1,5 @@
+March 29, 2016 - Version 1.0.1
+- Fix: Do not show activation message if user was already registered before Super Forms was activated
+
 January 10, 2016 - Version 1.0.0
 - Initial release!
