@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.0.1
+ * Version:     1.0.2
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *	@since		1.0.0
         */
-        public $version = '1.0.1';
+        public $version = '1.0.2';
 
         
         /**
@@ -192,7 +192,7 @@ if(!class_exists('SUPER_Register_Login')) :
             $suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
             $handle = 'super-register-common';
             $name = str_replace( '-', '_', $handle ) . '_i18n';
-            wp_register_script( $handle, plugin_dir_url( __FILE__ ) . 'assets/js/frontend/common' . $suffix . '.js', array( 'jquery' ), SUPER_VERSION, false );  
+            wp_register_script( $handle, plugin_dir_url( __FILE__ ) . 'assets/js/frontend/common' . $suffix . '.js', array( 'jquery' ), SUPER_Register_Login()->version, false );  
             wp_localize_script( $handle, $name, array( 'ajaxurl'=>SUPER_Forms()->ajax_url(), 'duration'=>absint( $settings['form_duration'] ) ) );
             wp_enqueue_script( $handle );
         }
@@ -259,7 +259,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public static function activation_code( $tag, $atts ) {
+        public static function activation_code( $tag, $atts, $inner, $shortcodes=null, $settings=null ) {
             
             $return = false;
             if( ( SUPER_Forms::is_request( 'frontend' ) ) && ( isset( $_GET['code'] ) ) ) {
@@ -273,7 +273,7 @@ if(!class_exists('SUPER_Register_Login')) :
             if( $return==true ) {
                 $atts['name'] = 'activation_code';
                 $result = SUPER_Shortcodes::opening_tag( $tag, $atts );
-                $result .= SUPER_Shortcodes::opening_wrapper( $atts );
+                $result .= SUPER_Shortcodes::opening_wrapper( $atts, $inner, $shortcodes, $settings );
                 $result .= '<input class="super-shortcode-field" type="text"';
                 $result .= ' name="' . $atts['name'] . '" value="' . $code . '"';
                 $result .= SUPER_Shortcodes::common_attributes( $atts, $tag );
