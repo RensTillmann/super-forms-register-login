@@ -1,3 +1,7 @@
+Sep 17, 2016 - Version 1.0.3
+- Added: User login status
+- Added: New action hook: super_after_wp_insert_user_action
+
 May 3, 2016 - Version 1.0.2
 - Fix: Parsing Super Forms version instead of own plugin version when registering script 
 

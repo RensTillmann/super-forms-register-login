@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.0.2
+ * Version:     1.0.3
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *	@since		1.0.0
         */
-        public $version = '1.0.2';
+        public $version = '1.0.3';
 
         
         /**
@@ -141,14 +141,18 @@ if(!class_exists('SUPER_Register_Login')) :
          *	@since		1.0.0
         */
         private function init_hooks() {
-            
+
             // Filters since 1.0.0
             add_filter( 'super_shortcodes_after_form_elements_filter', array( $this, 'add_activation_code_element' ), 10, 2 );
+
+            // Filters since 1.0.3
+            add_filter( 'wp_authenticate_user', array( $this, 'check_user_login_status' ), 10, 2 );
 
             // Actions since 1.0.0
             add_action( 'wp_ajax_super_resend_activation', array( $this, 'resend_activation' ) );
             add_action( 'wp_ajax_nopriv_super_resend_activation', array( $this, 'resend_activation' ) );
-            
+
+
             if ( $this->is_request( 'frontend' ) ) {
                 
                 // Filters since 1.0.0
@@ -168,6 +172,13 @@ if(!class_exists('SUPER_Register_Login')) :
                 add_action( 'super_before_load_form_dropdown_hook', array( $this, 'add_ready_to_use_forms' ) );
                 add_action( 'super_after_load_form_dropdown_hook', array( $this, 'add_ready_to_use_forms_json' ) );
 
+                // Actions since 1.0.3
+                add_action( 'show_user_profile', array( $this, 'add_customer_meta_fields' ) );
+                add_action( 'edit_user_profile', array( $this, 'add_customer_meta_fields' ) );
+                add_action( 'personal_options_update', array( $this, 'save_customer_meta_fields' ) );
+                add_action( 'edit_user_profile_update', array( $this, 'save_customer_meta_fields' ) );
+
+
             }
             
             if ( $this->is_request( 'ajax' ) ) {
@@ -179,6 +190,104 @@ if(!class_exists('SUPER_Register_Login')) :
 
             }
             
+        }
+
+        /**
+         * Add extra auth login check based on user login status
+         *
+         * @since      1.0.3
+         */
+        public function check_user_login_status( $user, $password ) {
+            
+            // Now check if the login status of the user is pending or blocked
+            $user_login_status = get_user_meta( $user->ID, 'super_user_login_status', true );
+            if( ($user_login_status=='pending') || ($user_login_status=='blocked') ) {
+                remove_action('authenticate', 'wp_authenticate_username_password', 20);
+                $user = new WP_Error( 'account_not_active', __( '<strong>ERROR</strong>: You are not allowed to login.', 'super' ) );
+            }
+            return $user;
+        }
+
+
+        /**
+         * Get Status Field for the edit user pages.
+         *
+         * @since      1.0.3
+         */
+        public function get_customer_meta_fields() {
+            $fields = array(
+                'super_user_login_status' => array(
+                    'title' => __( 'Super Forms - User Status', 'super' ),
+                    'fields' => array(
+                        'super_user_login_status' => array(
+                            'label' => __( 'User Status', 'super' ),
+                            'description' => __( 'When set to pending/blocked user won\'t be able to login', 'super' ),
+                            'type' => 'select',
+                            'options' => array(
+                                'active' => __( 'Active', 'super' ),
+                                'pending' => __( 'Pending', 'super' ),
+                                'blocked' => __( 'Blocked', 'super' ),
+                            )
+                        ),
+                    )
+                ),
+            );
+            return $fields;
+        }
+
+
+        /**
+         * Show Status Field on edit user pages.
+         *
+         * @param WP_User $user
+         * @since      1.0.3
+         */
+        public function add_customer_meta_fields( $user ) {
+            $show_fields = $this->get_customer_meta_fields();
+            foreach( $show_fields as $fieldset ) {
+                echo '<h3>' . $fieldset['title'] . '</h3>';
+                echo '<table class="form-table">';
+                foreach( $fieldset['fields'] as $key => $field ) {
+                    echo '<tr>';
+                        echo '<th>';
+                            echo '<label for="' . esc_attr( $key ) . '">' . esc_html( $field['label'] ) . '</label>';
+                        echo '</th>';
+                        echo '<td>';
+                            if ( ! empty( $field['type'] ) && 'select' == $field['type'] ) {
+                                echo '<select name="' . esc_attr( $key ) . '" id="' . esc_attr( $key ) . '" class="' . ( ! empty( $field['class'] ) ? $field['class'] : '' ) . '" style="width: 25em;">';
+                                $selected = esc_attr( get_user_meta( $user->ID, $key, true ) );
+                                foreach( $field['options'] as $option_key => $option_value ) {
+                                    echo '<option value="' . esc_attr( $option_key ) . '" ' . selected( $selected, $option_key, true ) . '>' . esc_attr( $option_value ) . '</option>';
+                                }
+                                echo '</select>';
+                            }else{
+                                echo '<input type="text" name="' . esc_attr( $key ) . '" id="' . esc_attr( $key ) . '" value="' . esc_attr( get_user_meta( $user->ID, $key, true ) ) . '" class="' . ( ! empty( $field['class'] ) ? $field['class'] : 'regular-text' ) . '" />';
+                            }
+                            echo '<br/>';
+                            echo '<span class="description">' . wp_kses_post( $field['description'] ) . '</span>';
+                        echo '</td>';
+                    echo '</tr>';
+                }
+                echo '</table>';
+            }
+        }
+
+
+        /**
+         * Save Address Fields on edit user pages.
+         *
+         * @param int $user_id User ID of the user being saved
+         * @since      1.0.3
+         */
+        public function save_customer_meta_fields( $user_id ) {
+            $save_fields = $this->get_customer_meta_fields();
+            foreach ( $save_fields as $fieldset ) {
+                foreach ( $fieldset['fields'] as $key => $field ) {
+                    if ( isset( $_POST[ $key ] ) ) {
+                        update_user_meta( $user_id, $key, wc_clean( $_POST[ $key ] ) );
+                    }
+                }
+            }
         }
 
         
@@ -391,6 +500,20 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter_value' => 'register',
                         'values' => $reg_roles,
                     ),
+                    'register_user_signup_status' => array(
+                        'name' => __( 'User login status after registration', 'super' ),
+                        'desc' => __( 'The login status the user should get after completed registration.', 'super' ),
+                        'type' => 'select',
+                        'default' => SUPER_Settings::get_value( 0, 'register_user_signup_status', $settings['settings'], 'active' ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'register',
+                        'values' => array(
+                            'active' => __( 'Active (default)', 'super' ),
+                            'pending' => __( 'Pending', 'super' ),
+                            'blocked' => __( 'Blocked', 'super' ),
+                        ),
+                    ),
                     'register_login_activation' => array(
                         'name' => __( 'Send activation email', 'super' ),
                         'desc' => __( 'Optionally let users activate their account or let them instantly login without verification', 'super' ),
@@ -401,7 +524,9 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter_value' => 'register',
                         'values' => array(
                             'verify' => __( 'Send activation email', ' super' ),
-                            'auto' => __( 'Auto activate and login', 'super' ),
+                            'auto' => __( 'Auto activate and login (login status will also be updated to: active)', 'super' ),
+                            'activate' => __( 'Auto activate but don\'t login automatically', 'super' ),
+                            'none' => __( 'Do nothing (don\'t send email and don\'t activate)', 'super' ),
                         ),
                     ),
                     'register_login_url' => array(
@@ -441,8 +566,8 @@ if(!class_exists('SUPER_Register_Login')) :
                         'desc' => __( 'Example: Activate your account', 'super' ),
                         'default' => SUPER_Settings::get_value( 0, 'register_activation_subject', $settings['settings'], __( 'Activate your account', 'super' ) ),
                         'filter' => true,
-                        'parent' => 'register_login_action',
-                        'filter_value' => 'register,login',
+                        'parent' => 'register_login_activation',
+                        'filter_value' => 'verify',
                     ),
                     'register_activation_email' => array(
                         'name' => __( 'Activation Email Body', 'super' ),
@@ -450,8 +575,8 @@ if(!class_exists('SUPER_Register_Login')) :
                         'type' => 'textarea',
                         'default' => SUPER_Settings::get_value( 0, 'register_activation_email', $settings['settings'], "Dear {field_user_login},\n\nThank you for registering! Before you can login you will need to activate your account.\nBelow you will find your activation code. You need this code to activate your account:\n\nActivation Code: <strong>{register_activation_code}</strong>\n\nClick <a href=\"{register_login_url}?code={register_activation_code}\">here</a> to activate your account with the provided code.\n\n\nBest regards,\n\n{option_blogname}" ),
                         'filter' => true,
-                        'parent' => 'register_login_action',
-                        'filter_value' => 'register,login',
+                        'parent' => 'register_login_activation',
+                        'filter_value' => 'verify',
                     ),                                      
                     'register_login_user_meta' => array(
                         'name' => __( 'Save custom user meta', 'super' ),
@@ -528,11 +653,33 @@ if(!class_exists('SUPER_Register_Login')) :
                 // Now lets check if a user already exists with the same user_login or user_email
                 $user_login = sanitize_user( $data['user_login']['value'] );
                 $user_email = sanitize_email( $data['user_email']['value'] );
+                
                 $username_exists = username_exists($user_login);
+                if( $username_exists!=false ) {
+                    $user = get_user_by( 'login', $user_login );
+                    $user_login_status = get_user_meta( $user->ID, 'super_user_login_status', true );
+                    if( ($user_login_status=='active') || ($user_login_status=='') ) {
+                        $username_exists = true;
+                    }else{
+                        wp_delete_user( $user->ID );
+                        $username_exists = false;
+                    }
+                }
+
                 $email_exists = email_exists($user_email);        
+                if( $email_exists!=false ) {
+                    $user = get_user_by( 'email', $user_email );
+                    $user_login_status = get_user_meta( $user->ID, 'super_user_login_status', true );
+                    if( ($user_login_status=='active') || ($user_login_status=='') ) {
+                        $email_exists = true;
+                    }else{
+                        wp_delete_user( $user->ID );
+                        $email_exists = false;
+                    }
+                }
+
                 if( ( $username_exists!=false ) || ( $email_exists!=false ) ) {
                     $msg = __( 'Username or Email address already exists, please try again', 'super' );
-                    $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                     SUPER_Common::output_error(
                         $error = true,
                         $msg = $msg,
@@ -595,6 +742,9 @@ if(!class_exists('SUPER_Register_Login')) :
                     );
                 }
 
+                // @since v1.0.3 - currently used by the WooCommerce Checkout Add-on
+                do_action( 'super_after_wp_insert_user_action', array( 'user_id'=>$user_id, 'atts'=>$atts ) );
+
                 // Save custom user meta
                 $meta_data = array();
                 $custom_user_meta = explode( "\n", $settings['register_login_user_meta'] );
@@ -607,6 +757,10 @@ if(!class_exists('SUPER_Register_Login')) :
                 foreach( $meta_data as $k => $v ) {
                     update_user_meta( $user_id, $k, $v ); 
                 }
+
+                // @since 1.0.3
+                if( !isset($settings['register_user_signup_status']) ) $settings['register_user_signup_status'] = 'active';
+                update_user_meta( $user_id, 'super_user_login_status', $settings['register_user_signup_status'] );
 
                 // Check if we need to send an activation email to this user
                 if( $settings['register_login_activation']=='verify' ) {
@@ -644,7 +798,15 @@ if(!class_exists('SUPER_Register_Login')) :
                     wp_set_current_user( $user_id );
                     wp_set_auth_cookie( $user_id );
                     update_user_meta( $user_id, 'super_last_login', time() );
+                    update_user_meta( $user_id, 'super_account_status', 1 );
+                    update_user_meta( $user_id, 'super_user_login_status', 'active' );
                 }
+
+                // Check if automatically activate users
+                if( $settings['register_login_activation']=='activate' ) {
+                    update_user_meta( $user_id, 'super_account_status', 1 );
+                }
+
 
             }
 
@@ -673,6 +835,7 @@ if(!class_exists('SUPER_Register_Login')) :
 
                         // First check if the user role is allowed to login
                         $allowed = false;
+
                         if( ( !isset( $settings['login_user_role'] ) ) || ( $settings['login_user_role']=='' ) ) {
                             $allowed = true;
                         }else{
@@ -680,7 +843,8 @@ if(!class_exists('SUPER_Register_Login')) :
                             if( in_array( '', $settings['login_user_role'] ) ) {
                                 $allowed = true;
                             }
-                        }
+                        }                        
+
                         if( $allowed != true ) {
                             wp_logout();
                             $msg = __( 'You are not allowed to login!', 'super' );
@@ -939,73 +1103,7 @@ if(!class_exists('SUPER_Register_Login')) :
             $user_login = $user->user_login; 
             $user_email = $user->user_email;
 
-            do_action( 'super_after_new_user_notifcation_hook' );
-
-
-            /*
-            $message = '';
-            if( $method=='resend' ) {
-                $code = wp_generate_password( 8 );
-                $wpdb->update( $wpdb->users, array( 'super_activation_code' => $code, 'super_user_status' => '0' ), array( 'ID' => $user_id ) );
-                $user = get_userdata( $user_id );
-                $user_login = stripslashes( $user->user_login ); 
-                $user_email = stripslashes( $user->user_email );
-                $settings = get_option( 'super_settings' );
-                $settings['header_additional'] = '';
-                $message = '<body style="margin: 0; padding: 0;">';
-                $message .= __( 'Activation Code:', 'super' ) . ' <strong>' . $code . '</strong><br /><br />'; 
-                $url = network_site_url( 'wp-login.php?super_code=' . urlencode( $code ), 'login' );
-                $message .= __( 'Click', 'super' ) . ' <a href="' . $url . '">' . __( 'here', 'super' ) . '</a> ' . __( 'to activate your account.', 'super' ) . '<br /><br /><br />';
-                $message .= __( 'In case the link doesn\'t work, copy the following URL and paste it in your browsers address bar:' ) . '<br />';
-                $message .= '<pre>' . ( wp_login_url() . '?super_code=' . urlencode( $code ) ) . '</pre>';
-                $message .= '</body>';
-                $message = apply_filters( 'super_resend_activation_link_message_filter', $message, $user_login, $user_email, $code );
-                $settings['confirm_body'] = $message;
-                $settings['confirm_to'] = $user_email;
-                $settings['confirm_subject'] = apply_filters( 'super_resend_activation_subject_filter', sprintf( __( '[%s] Verify your account', 'super' ), get_option( 'blogname' ) ), $user_login, $user_email, $code );
-                $settings['send'] = 'no';
-                $settings['confirm'] = 'yes';
-                $settings['save_contact_entry'] = 'no';
-                tdfb_send_email( $settings );
-            }else{
-                $code = wp_generate_password( 8, false, false );
-                $wpdb->update( $wpdb->users, array( 'super_activation_code' => $code, 'super_user_status' => '0' ), array( 'ID' => $user_id ) );
-                $user = get_userdata( $user_id );
-                $obj = SUPER_Register_Login();
-                $user_login = stripslashes($user->user_login); 
-                $user_email = stripslashes($user->user_email);
-                $key = $password;
-                do_action( 'retrieve_password_key', $user->user_login, $key );
-                if ( empty( $wp_hasher ) ) {
-                    require_once ABSPATH . WPINC . '/class-phpass.php';
-                    $wp_hasher = new PasswordHash( 8, true );
-                }
-                $hashed = time() . ':' . $wp_hasher->HashPassword( $key );
-                $wpdb->update( $wpdb->users, array( 'user_activation_key' => $hashed ), array( 'user_login' => $user->user_login ) );
-                if($send_password) $message .= __( 'Password:', 'super' ).' <strong>'.$password.'</strong><br /><br />';
-                $message .= __( 'Activation Code:', 'super' ).' <strong>'.$code.'</strong><br /><br />'; 
-                $url = network_site_url( 'wp-login.php?super_code='.urlencode( $code ), 'login');
-                $message .= __( 'Click', 'super' ).' <a href="'.$url.'">'.__( 'here', 'super' ).'</a> '.__( 'to activate your account.', 'super' ).'<br /><br /><br />';
-                $message .= __( 'In case the link doesn\'t work, copy the following URL and paste it in your browsers address bar:' ) . '<br />';
-                $message .= '<pre>'.(wp_login_url().'?super_code='.urlencode( $code )).'</pre>';
-                if ( ( $notify=='both' ) || ( $notify=='user' ) ) {
-                    $obj->confirm = 'yes';
-                    $obj->confirm_body = $message;
-                    $obj->confirm_to = $user->user_email;
-                }
-                if ( ( $notify=='both' ) || ( $notify=='admin' ) ) {
-                    $blogname = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
-                    $message  = sprintf( __( 'New user registration on your site %s:' ), $blogname ) . "<br /><br />";
-                    $message .= sprintf( __( 'Username: %s' ), $user->user_login ) . "<br /><br />";
-                    $message .= sprintf( __( 'E-mail: %s' ), $user->user_email ) . "<br /><br />";
-                    $obj->send = 'yes';
-                    $obj->email_body = $message;
-                }
-                add_filter( 'tdfb_before_sending_email_settings_filter', array( $obj, 'update_confirm_settings' ) );
-            }
-            */
-
-                        
+            do_action( 'super_after_new_user_notifcation_hook' );                        
         
         }
 
