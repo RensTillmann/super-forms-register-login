@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.0.3
+ * Version:     1.0.4
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *	@since		1.0.0
         */
-        public $version = '1.0.3';
+        public $version = '1.0.4';
 
         
         /**
@@ -525,6 +525,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'values' => array(
                             'verify' => __( 'Send activation email', ' super' ),
                             'auto' => __( 'Auto activate and login (login status will also be updated to: active)', 'super-forms' ),
+                            'login' => __( 'Login automatically without activating', 'super-forms' ),
                             'activate' => __( 'Auto activate but don\'t login automatically', 'super-forms' ),
                             'none' => __( 'Do nothing (don\'t send email and don\'t activate)', 'super-forms' ),
                         ),
@@ -792,7 +793,15 @@ if(!class_exists('SUPER_Register_Login')) :
                         );
                     }
                 }
-                
+               
+                // @since 1.0.4
+                // Login the user without activating it's account
+                if( $settings['register_login_activation']=='login' ) {
+                    wp_set_current_user( $user_id );
+                    wp_set_auth_cookie( $user_id );
+                    update_user_meta( $user_id, 'super_last_login', time() );
+                }
+
                 // Check if we let users automatically login after registering (instant login)
                 if( $settings['register_login_activation']=='auto' ) {
                     wp_set_current_user( $user_id );
@@ -806,6 +815,10 @@ if(!class_exists('SUPER_Register_Login')) :
                 if( $settings['register_login_activation']=='activate' ) {
                     update_user_meta( $user_id, 'super_account_status', 1 );
                 }
+
+
+
+
 
 
             }
