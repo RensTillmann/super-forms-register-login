@@ -1,17 +1,17 @@
 <?php
 /**
- * Super Forms Register & Login
+ * Super Forms - Register & Login
  *
- * @package   Super Forms Register & Login
+ * @package   Super Forms - Register & Login
  * @author    feeling4design
  * @link      http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * @copyright 2015 by feeling4design
  *
  * @wordpress-plugin
- * Plugin Name: Super Forms Register & Login
+ * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.0.4
+ * Version:     1.1.0
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,9 +37,18 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *	@since		1.0.0
         */
-        public $version = '1.0.4';
+        public $version = '1.1.0';
 
-        
+
+        /**
+         * @var string
+         *
+         *  @since      1.1.0
+        */
+        public $add_on_slug = 'register_login';
+        public $add_on_name = 'Register & Login';
+
+
         /**
          * @var SUPER_Register_Login The single instance of the class
          *
@@ -142,6 +151,12 @@ if(!class_exists('SUPER_Register_Login')) :
         */
         private function init_hooks() {
 
+            // @since 1.1.0
+            register_deactivation_hook( __FILE__, array( $this, 'deactivate' ) );
+            // Filters since 1.1.0
+            add_filter( 'super_after_activation_message_filter', array( $this, 'activation_message' ), 10, 2 );
+
+
             // Filters since 1.0.0
             add_filter( 'super_shortcodes_after_form_elements_filter', array( $this, 'add_activation_code_element' ), 10, 2 );
 
@@ -178,6 +193,12 @@ if(!class_exists('SUPER_Register_Login')) :
                 add_action( 'personal_options_update', array( $this, 'save_customer_meta_fields' ) );
                 add_action( 'edit_user_profile_update', array( $this, 'save_customer_meta_fields' ) );
 
+                // Filters since 1.1.0
+                add_filter( 'super_settings_end_filter', array( $this, 'activation' ), 100, 2 );
+                
+                // Actions since 1.1.0
+                add_action( 'init', array( $this, 'update_plugin' ) );
+
 
             }
             
@@ -191,6 +212,67 @@ if(!class_exists('SUPER_Register_Login')) :
             }
             
         }
+
+
+        /**
+         * Automatically update plugin from the repository
+         *
+         *  @since      1.1.0
+        */
+        function update_plugin() {
+            if( defined('SUPER_PLUGIN_DIR') ) {
+                require_once ( SUPER_PLUGIN_DIR . '/includes/admin/update-super-forms.php' );
+                $plugin_remote_path = 'http://f4d.nl/super-forms/';
+                $plugin_slug = plugin_basename( __FILE__ );
+                new SUPER_WP_AutoUpdate( $this->version, $plugin_remote_path, $plugin_slug, '', '', $this->add_on_slug );
+            }
+        }
+
+
+        /**
+         * Add the activation under the "Activate" TAB
+         * 
+         * @since       1.1.0
+        */
+        public function activation($array, $data) {
+            if (method_exists('SUPER_Forms','add_on_activation')) {
+                return SUPER_Forms::add_on_activation($array, $this->add_on_slug, $this->add_on_name);
+            }else{
+                return $array;
+            }
+        }
+
+
+        /**  
+         *  Deactivate
+         *
+         *  Upon plugin deactivation delete activation
+         *
+         *  @since      1.1.0
+         */
+        public static function deactivate(){
+            if (method_exists('SUPER_Forms','add_on_deactivate')) {
+                SUPER_Forms::add_on_deactivate(SUPER_Register_Login()->add_on_slug);
+            }
+        }
+
+
+        /**
+         * Check license and show activation message
+         * 
+         * @since       1.1.0
+        */
+        public function activation_message( $activation_msg, $data ) {
+            if (method_exists('SUPER_Forms','add_on_activation_message')) {
+                $form_id = absint($data['id']);
+                $settings = $data['settings'];
+                if( (isset($settings['register_login_action'])) && ($settings['register_login_action']!='none') ) {
+                    return SUPER_Forms::add_on_activation_message($activation_msg, $this->add_on_slug, $this->add_on_name);
+                }
+            }
+            return $activation_msg;
+        }
+
 
         /**
          * Add extra auth login check based on user login status
@@ -734,7 +816,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 // Insert the user and return the user ID
                 $user_id = wp_insert_user( $userdata );
                 if( is_wp_error( $user_id ) ) {
-                    $msg = __( 'Something went wrong while registering your acount, please try again', 'super-forms' );
+                    $msg = $user_id->get_error_message();
                     $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                     SUPER_Common::output_error(
                         $error = true,
