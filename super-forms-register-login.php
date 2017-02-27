@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.1.0
+ * Version:     1.2.0
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *	@since		1.0.0
         */
-        public $version = '1.1.0';
+        public $version = '1.2.0';
 
 
         /**
@@ -143,7 +143,7 @@ if(!class_exists('SUPER_Register_Login')) :
             }
         }
 
-        
+  
         /**
          * Hook into actions and filters
          *
@@ -167,6 +167,10 @@ if(!class_exists('SUPER_Register_Login')) :
             add_action( 'wp_ajax_super_resend_activation', array( $this, 'resend_activation' ) );
             add_action( 'wp_ajax_nopriv_super_resend_activation', array( $this, 'resend_activation' ) );
 
+
+            // Filters since 1.2.0
+            add_filter( 'super_form_settings_filter', array( $this, 'set_get_values' ), 10, 2 );
+            add_filter( 'super_countries_list_filter', array( $this, 'return_wc_countries' ), 10, 2 );
 
             if ( $this->is_request( 'frontend' ) ) {
                 
@@ -211,6 +215,59 @@ if(!class_exists('SUPER_Register_Login')) :
 
             }
             
+        }
+
+
+        /**
+         * Return WC countries list for billing_country and shipping_country only
+         *
+         *  @since      1.2.0
+        */
+        public function return_wc_countries($countries, $data) {
+            if( (class_exists('WC_Countries')) && ($data['settings']['register_login_action']=='update') && ( ($data['name']=='billing_country') || ($data['name']=='shipping_country') ) ) {
+                $countries_obj = new WC_Countries();
+                $countries = $countries_obj->__get('countries');
+                return $countries;
+            }
+            return $countries;
+        }
+
+
+        /**
+         * Set $_GET values for updating user forms
+         *
+         *  @since      1.2.0
+        */
+        public function set_get_values($settings, $data) {
+            
+            // Before proceeding, check if a user is logged in
+            if( ($settings['register_login_action']=='update') && (is_user_logged_in()) ) {
+                global $current_user;
+                
+                // Get all user data
+                $user_data = (array) $current_user->data;
+                
+                // Set $_GET values for user data
+                foreach( $user_data as $k => $v ) {
+                    if( !isset($_GET[$k]) ) {
+                        $_GET[$k] = $v;
+                    }
+                }
+
+                // Get all user meta data
+                $meta = get_user_meta( $user_data['ID'] );
+
+                // Filter out empty meta data
+                $meta = array_filter( array_map( function( $a ) {
+                    return $a[0];
+                }, $meta ) );
+
+                // Set $_GET values for meta data
+                foreach( $meta as $k => $v ) {
+                    $_GET[$k] = $v;
+                }
+            }
+            return $settings;
         }
 
 
@@ -263,6 +320,12 @@ if(!class_exists('SUPER_Register_Login')) :
          * @since       1.1.0
         */
         public function activation_message( $activation_msg, $data ) {
+
+            // @since 1.2.0 - display message for updating action that user is not logged in
+            if( (isset($settings['register_login_action'])) && (!is_user_logged_in()) && ($settings['register_login_action']=='update') && ($settings['register_login_not_logged_in_msg']!='') ) {
+                return $settings['register_login_not_logged_in_msg'];
+            }
+
             if (method_exists('SUPER_Forms','add_on_activation_message')) {
                 $form_id = absint($data['id']);
                 $settings = $data['settings'];
@@ -559,6 +622,7 @@ if(!class_exists('SUPER_Register_Login')) :
                             'register' => __( 'Register a new user', 'super-forms' ),
                             'login' => __( 'Login (user will be logged in)', 'super-forms' ),
                             'reset_password' => __( 'Reset password (lost password)', 'super-forms' ),
+                            'update' => __( 'Update current logged in user', 'super-forms' ),
                         ),
                     ),
                     'login_user_role' => array(
@@ -618,7 +682,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_login_url', $settings['settings'], get_site_url() . '/login/' ),
                         'filter' => true,
                         'parent' => 'register_login_action',
-                        'filter_value' => 'register,login,reset_password',
+                        'filter_value' => 'register,login,reset_password,update',
                     ),
                     'register_welcome_back_msg' => array(
                         'name' => __( 'Welcome back message', 'super-forms' ),
@@ -665,11 +729,66 @@ if(!class_exists('SUPER_Register_Login')) :
                         'name' => __( 'Save custom user meta', 'super-forms' ),
                         'desc' => __( 'Usefull for external plugins such as WooCommerce. Example: "field_name|meta_key" (each on a new line)', 'super-forms' ),
                         'type' => 'textarea',
-                        'default' => SUPER_Settings::get_value( 0, 'register_login_user_meta', $settings['settings'], "first_name|billing_first_name\nlast_name|billing_last_name\naddress|billing_address" ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_user_meta', $settings['settings'], "billing_first_name|billing_first_name\nbilling_last_name|billing_last_name\nbilling_company|billing_company\nbilling_address_1|billing_address_1\nbilling_address_2|billing_address_2\nbilling_city|billing_city\nbilling_postcode|billing_postcode\nbilling_country|billing_country\nbilling_state|billing_state\nbilling_phone|billing_phone\nbilling_email|billing_email\nshipping_first_name|shipping_first_name\nshipping_last_name|shipping_last_name\nshipping_company|shipping_company\nshipping_address_1|shipping_address_1\nshipping_address_2|shipping_address_2\nshipping_city|shipping_city\nshipping_postcode|shipping_postcode\nshipping_country|shipping_country\nshipping_state|shipping_state" ),
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'register',
                     ),
+
+                    'register_login_multisite_enabled' => array(
+                        'desc' => __( 'This will create a new site within your wordpress site network', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_enabled', $settings['settings'], '' ),
+                        'type' => 'checkbox',
+                        'values' => array(
+                            'true' => __( 'Create new Multi-site after registration', 'super-forms' ),
+                        ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'register'
+                    ),
+                    'register_login_multisite_domain' => array(
+                        'name' => __( 'Domain name for blog', 'super-forms' ),
+                        'label' => __( 'Default: None', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_domain', $settings['settings'], '{user_email}' ),
+                        'filter' => true,
+                        'parent' => 'register_login_multisite_enabled',
+                        'filter_value' => 'true'
+                    ),
+                    'register_login_multisite_path' => array(
+                        'name' => __( 'Path to the blog', 'super-forms' ),
+                        'label' => __( 'Default: None', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_path', $settings['settings'], '{user_email}' ),
+                        'filter' => true,
+                        'parent' => 'register_login_multisite_enabled',
+                        'filter_value' => 'true'
+                    ),
+                    'register_login_multisite_title' => array(
+                        'name' => __( 'Title for blog', 'super-forms' ),
+                        'label' => __( 'Default: None', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_title', $settings['settings'], '{user_email}' ),
+                        'filter' => true,
+                        'parent' => 'register_login_multisite_enabled',
+                        'filter_value' => 'true'
+                    ),
+                    'register_login_multisite_id' => array(
+                        'name' => __( 'Site ID, if running multiple networks', 'super-forms' ),
+                        'label' => __( 'Default: 1', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_id', $settings['settings'], '1' ),
+                        'filter' => true,
+                        'parent' => 'register_login_multisite_enabled',
+                        'filter_value' => 'true'
+                    ),
+                    'register_login_multisite_email' => array(
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_email', $settings['settings'], 'true' ),
+                        'type' => 'checkbox',
+                        'values' => array(
+                            'true' => __( 'Send site credentials to the user email', 'super-forms' ),
+                        ),
+                        'filter' => true,
+                        'parent' => 'register_login_multisite_enabled',
+                        'filter_value' => 'true'
+                    ),
+
                     'register_reset_password_success_msg' => array(
                         'name' => __( 'Success message', 'super-forms' ),
                         'desc' => __( 'Display a message after user has reset their password (leave blank for no message)', 'super-forms' ),
@@ -703,6 +822,29 @@ if(!class_exists('SUPER_Register_Login')) :
                         'parent' => 'register_login_action',
                         'filter_value' => 'reset_password',
                     ),
+
+                    // @since 1.2.0 - not logged in user for when we are updating user data
+                    'register_login_not_logged_in_msg' => array(
+                        'name' => __( 'Not logged in message (leave blank for no message)', 'super-forms' ),
+                        'desc' => __( 'Display a message when no user is logged in', 'super-forms' ),
+                        'type' => 'textarea',
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_not_logged_in_msg', $settings['settings'], 'You must be logged in to submit this form. Click <a href=\"{register_login_url}\">here</a> to login!' ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'update',
+                    ),
+                    'register_login_update_user_meta' => array(
+                        'name' => __( 'Update custom user meta', 'super-forms' ),
+                        'label' => __( 'E.g: field_name|meta_key (each on a new line)', 'super-forms' ),
+                        'desc' => __( 'Usefull for external plugins such as WooCommerce.', 'super-forms' ),
+                        'type' => 'textarea',
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_update_user_meta', $settings['settings'], "billing_first_name|billing_first_name\nbilling_last_name|billing_last_name\nbilling_company|billing_company\nbilling_address_1|billing_address_1\nbilling_address_2|billing_address_2\nbilling_city|billing_city\nbilling_postcode|billing_postcode\nbilling_country|billing_country\nbilling_state|billing_state\nbilling_phone|billing_phone\nbilling_email|billing_email\nshipping_first_name|shipping_first_name\nshipping_last_name|shipping_last_name\nshipping_company|shipping_company\nshipping_address_1|shipping_address_1\nshipping_address_2|shipping_address_2\nshipping_city|shipping_city\nshipping_postcode|shipping_postcode\nshipping_country|shipping_country\nshipping_state|shipping_state" ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'update',
+                    ),
+
+
                 )
             );
             return $array;
@@ -720,6 +862,66 @@ if(!class_exists('SUPER_Register_Login')) :
             
             if( !isset( $settings['register_login_action'] ) ) return true;
             if( $settings['register_login_action']=='none' ) return true;
+
+            // @since 1.2.0 - update existing user data
+            if( $settings['register_login_action']=='update' ) {
+
+                // Before proceeding, check if a user is logged in
+                if ( !is_user_logged_in() ) {
+                    $msg = $settings['register_login_not_logged_in_msg'];
+                    SUPER_Common::output_error(
+                        $error = true,
+                        $msg = $msg,
+                        $redirect = null
+                    );
+                }
+
+                // Loop through all default user data that WordPress provides us with out of the box
+                $userdata = array(
+                    'user_login',
+                    'user_email',
+                    'user_pass',
+                    'user_registered',
+                    'show_admin_bar_front',
+                    'user_nicename',
+                    'user_url',
+                    'display_name',
+                    'nickname',
+                    'first_name',
+                    'last_name',
+                    'description',
+                    'rich_editing',
+                    'role', // This is in case we have a custom dropdown with the name "role" which allows users to select their own account type/role
+                    'jabber',
+                    'aim',
+                    'yim'
+                );
+                foreach( $userdata as $k ) {
+                    if( isset( $data[$k]['value'] ) ) {
+                        $value = $data[$k]['value'];
+                        if( $k=='user_login' ) $value = sanitize_user($value);
+                        if( $k=='user_email' ) $value = sanitize_email($value);
+                        $userdata[$k] = $value;
+                    }
+                }
+                $user_id = get_current_user_id();
+                $userdata['ID'] = $user_id;
+                wp_update_user( $userdata );
+
+                // Save custom user meta
+                $meta_data = array();
+                $custom_user_meta = explode( "\n", $settings['register_login_update_user_meta'] );
+                foreach( $custom_user_meta as $k ) {
+                    $field = explode( "|", $k );
+                    if( isset( $data[$field[0]]['value'] ) ) {
+                        $meta_data[$field[1]] = $data[$field[0]]['value'];
+                    }
+                }
+
+                foreach( $meta_data as $k => $v ) {
+                    update_user_meta( $user_id, $k, $v ); 
+                }
+            }
 
             if( $settings['register_login_action']=='register' ) {
 
@@ -899,10 +1101,34 @@ if(!class_exists('SUPER_Register_Login')) :
                 }
 
 
-
-
-
-
+                // @since 1.1.0 - create multi-site
+                if( !isset($settings['register_login_multisite_enabled']) ) $settings['register_login_multisite_enabled'] = '';
+                if( $settings['register_login_multisite_enabled']=='true' ) {
+                    $user = get_user_by( 'id', $user_id );
+                    $domain = SUPER_Common::email_tags( $settings['register_login_multisite_domain'], $data, $settings, $user );
+                    $path = SUPER_Common::email_tags( $settings['register_login_multisite_path'], $data, $settings, $user );
+                    $title = SUPER_Common::email_tags( $settings['register_login_multisite_title'], $data, $settings, $user );
+                    $site_id = SUPER_Common::email_tags( $settings['register_login_multisite_id'], $data, $settings, $user );
+                    $site_meta = apply_filters( 'super_register_login_create_blog_site_meta', array(), $user_id, $meta_data, $atts, $settings );
+                    $blog_id = wpmu_create_blog($domain, $path, $title, $user_id, $site_meta, $site_id);
+                    if( is_wp_error( $blog_id ) ) {
+                        $msg = $blog_id->get_error_message();
+                        $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
+                        SUPER_Common::output_error(
+                            $error = true,
+                            $msg = $msg,
+                            $redirect = null
+                        );
+                    }
+                    global $current_site;
+                    if( (!is_super_admin($user_id)) && (get_user_option('primary_blog', $user_id)==$current_site->blog_id) ) {
+                        update_user_option( $user_id, 'primary_blog', $blog_id, true );
+                    }
+                    if( $settings['register_login_multisite_email']=='true' ) {
+                        wpmu_welcome_notification( $blog_id, $user_id, $password, $title, array('public'=>1) );
+                    }
+                    do_action( 'super_register_login_after_create_blog', $blog_id );
+                }
             }
 
             if( $settings['register_login_action']=='login' ) {
@@ -956,7 +1182,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         // Maybe this user was already registered before Super Forms was used, if so skip the test
                         if( ( !isset( $data['activation_code'] ) ) && ( $status==0 ) && ( $status!='' ) ) {
                             wp_logout();
-                            $msg = sprintf( __( 'You haven\'t activated your account yet. Please check your email or click <a href="#" class="resend-code" data-form="' . absint( $atts['post']['form_id'] ) . '" data-user="' . $username . '">here</a> to resend your activation email.', 'super-forms' ), $user->user_login );
+                            $msg = sprintf( __( 'You haven\'t activated your account yet. Please check your email or click <a href="#" class="resend-code" data-form="%d" data-user="%s">here</a> to resend your activation email.', 'super-forms' ), absint( $atts['post']['form_id'] ), $user->user_login );
                             $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                             SUPER_Common::output_error(
                                 $error = true,
@@ -1128,7 +1354,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 $name = $user->display_name;
                 $code = wp_generate_password( 8, false );
                 $password = wp_generate_password();
-                $user_id = wp_update_user( array( 'ID' => $user->ID, 'user_pass' => 'stropdas' ) );
+                $user_id = wp_update_user( array( 'ID' => $user->ID, 'user_pass' => $password ) );
                 update_user_meta( $user->ID, 'super_account_activation', $code );
                 
                 // Get the form settings, so we can setup the correct email message and subject
