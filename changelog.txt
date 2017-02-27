@@ -1,6 +1,7 @@
-Feb 27, 2017 - Version 1.2.0
+Feb 28, 2017 - Version 1.2.0
 - Added: Option to update current logged in user data / meta data
 - Added: Option to register multi-site 
+- Added: Return WC country list when field is named billing_country or shipping_country
 
 Feb 03, 2017 - Version 1.1.0
 - Added: Automatic updates
