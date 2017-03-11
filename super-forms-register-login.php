@@ -241,7 +241,7 @@ if(!class_exists('SUPER_Register_Login')) :
         public function set_get_values($settings, $data) {
             
             // Before proceeding, check if a user is logged in
-            if( ($settings['register_login_action']=='update') && (is_user_logged_in()) ) {
+            if( (isset($settings['register_login_action'])) && ($settings['register_login_action']=='update') && (is_user_logged_in()) ) {
                 global $current_user;
                 
                 // Get all user data
