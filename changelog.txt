@@ -1,3 +1,6 @@
+Mar 12, 2017 - Version 1.2.1
+- Fix: PHP error: undefined register_login_action
+
 Feb 28, 2017 - Version 1.2.0
 - Added: Option to update current logged in user data / meta data
 - Added: Option to register multi-site 
