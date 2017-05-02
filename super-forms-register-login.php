@@ -429,7 +429,11 @@ if(!class_exists('SUPER_Register_Login')) :
             foreach ( $save_fields as $fieldset ) {
                 foreach ( $fieldset['fields'] as $key => $field ) {
                     if ( isset( $_POST[ $key ] ) ) {
-                        update_user_meta( $user_id, $key, wc_clean( $_POST[ $key ] ) );
+                        if (function_exists('wc_clean')) {
+                            update_user_meta( $user_id, $key, wc_clean( $_POST[ $key ] ) );
+                        }else{
+                            update_user_meta( $user_id, $key, sanitize_text_field( $_POST[ $key ] ) );
+                        }
                     }
                 }
             }
