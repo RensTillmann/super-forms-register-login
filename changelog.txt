@@ -1,3 +1,6 @@
+May 2, 2017 - Version 1.2.2
+- Fix: Check if wp_clean function exists
+
 Mar 12, 2017 - Version 1.2.1
 - Fix: PHP error: undefined register_login_action
 
