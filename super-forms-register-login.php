@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.2.2
+ * Version:     1.2.3
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *	@since		1.0.0
         */
-        public $version = '1.2.2';
+        public $version = '1.2.3';
 
 
         /**
@@ -447,10 +447,10 @@ if(!class_exists('SUPER_Register_Login')) :
         */
         public static function resend_activation_code_script( $data ) {
             $settings = get_option( 'super_settings' );
-            $suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
+            $suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '.min' : '.min';
             $handle = 'super-register-common';
             $name = str_replace( '-', '_', $handle ) . '_i18n';
-            wp_register_script( $handle, plugin_dir_url( __FILE__ ) . 'assets/js/frontend/common' . $suffix . '.js', array( 'jquery' ), SUPER_Register_Login()->version, false );  
+            wp_register_script( $handle, plugin_dir_url( __FILE__ ) . 'assets/js/frontend/common.min.js', array( 'jquery' ), SUPER_Register_Login()->version, false );  
             wp_localize_script( $handle, $name, array( 'ajaxurl'=>SUPER_Forms()->ajax_url(), 'duration'=>absint( $settings['form_duration'] ) ) );
             wp_enqueue_script( $handle );
         }
@@ -1068,9 +1068,24 @@ if(!class_exists('SUPER_Register_Login')) :
                     $message = nl2br( $message );
                     $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings, $user );
                     $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings, $user );
+	        		$attachments = apply_filters( 'super_register_login_before_verify_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$email_body ) );
 
-                    // Send the email
-                    $mail = SUPER_Common::email( $user_email, $from, $from_name, '', '', $subject, $message, $settings );
+	        		// @since 1.3.0 - custom reply to headers
+		            if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
+		            $reply = '';
+		            $reply_name = '';
+		            if( $settings['header_reply_enabled']==false ) {
+		                $custom_reply = false;
+		            }else{
+		                $custom_reply = true;
+		                if( !isset($settings['header_reply']) ) $settings['header_reply'] = '';
+		                if( !isset($settings['header_reply_name']) ) $settings['header_reply_name'] = '';
+		                $reply = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply'], $data, $settings ) );
+		                $reply_name = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply_name'], $data, $settings ) );
+		            }
+
+	                // Send the email
+	       			$mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
 
                     // Return message
                     if( !empty( $mail->ErrorInfo ) ) {
@@ -1316,9 +1331,24 @@ if(!class_exists('SUPER_Register_Login')) :
                 $message = nl2br( $message );
                 $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings, $user );
                 $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings, $user );
+        		$attachments = apply_filters( 'super_register_login_before_sending_reset_password_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$email_body ) );
+
+        		// @since 1.3.0 - custom reply to headers
+	            if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
+	            $reply = '';
+	            $reply_name = '';
+	            if( $settings['header_reply_enabled']==false ) {
+	                $custom_reply = false;
+	            }else{
+	                $custom_reply = true;
+	                if( !isset($settings['header_reply']) ) $settings['header_reply'] = '';
+	                if( !isset($settings['header_reply_name']) ) $settings['header_reply_name'] = '';
+	                $reply = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply'], $data, $settings ) );
+	                $reply_name = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply_name'], $data, $settings ) );
+	            }
 
                 // Send the email
-                $mail = SUPER_Common::email( $user_email, $from, $from_name, '', '', $subject, $message, $settings );
+       			$mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
 
                 // Return message
                 if( !empty( $mail->ErrorInfo ) ) {
@@ -1375,9 +1405,24 @@ if(!class_exists('SUPER_Register_Login')) :
                 $message = nl2br( $message );
                 $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings );
                 $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings );
+        		$attachments = apply_filters( 'super_register_login_before_resend_activation_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$email_body ) );
+
+        		// @since 1.3.0 - custom reply to headers
+	            if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
+	            $reply = '';
+	            $reply_name = '';
+	            if( $settings['header_reply_enabled']==false ) {
+	                $custom_reply = false;
+	            }else{
+	                $custom_reply = true;
+	                if( !isset($settings['header_reply']) ) $settings['header_reply'] = '';
+	                if( !isset($settings['header_reply_name']) ) $settings['header_reply_name'] = '';
+	                $reply = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply'], $data, $settings ) );
+	                $reply_name = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply_name'], $data, $settings ) );
+	            }
 
                 // Send the email
-                $mail = SUPER_Common::email( $to, $from, $from_name, '', '', $subject, $message, $settings );
+       			$mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
 
                 // Return message
                 if( !empty( $mail->ErrorInfo ) ) {

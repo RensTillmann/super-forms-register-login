@@ -1,3 +1,7 @@
+May 9, 2017 - Version 1.2.3
+- Fix: Email function updated based on new super forms version
+- Changed: Removed suffix on css/js files (normally used for debug mode, not required)
+
 May 2, 2017 - Version 1.2.2
 - Fix: Check if wp_clean function exists
 
