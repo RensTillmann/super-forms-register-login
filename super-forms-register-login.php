@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.2.3
+ * Version:     1.2.4
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *	@since		1.0.0
         */
-        public $version = '1.2.3';
+        public $version = '1.2.4';
 
 
         /**
@@ -1054,6 +1054,12 @@ if(!class_exists('SUPER_Register_Login')) :
                 // Check if we need to send an activation email to this user
                 if( $settings['register_login_activation']=='verify' ) {
                     $code = wp_generate_password( 8, false );
+                    
+                    // @since 1.2.4 - allows users to use a custom activation code, for instance generated with the unique random number with a hidden field
+                    if(isset($data['register_activation_code'])){
+                        $code = $data['register_activation_code']['value'];
+                    }
+                    
                     update_user_meta( $user_id, 'super_account_status', 0 ); // 0 = inactive, 1 = active
                     update_user_meta( $user_id, 'super_account_activation', $code ); 
                     $user = get_user_by( 'id', $user_id );
@@ -1242,12 +1248,17 @@ if(!class_exists('SUPER_Register_Login')) :
                                 $redirect = $settings['form_redirect'];
                             }
                         }
-                        if( $activated!=false ) {
+                        if( ($activated==false) || ($activated==true) ) {
                             if( $activated==false ) {
                                 wp_logout();
                                 $msg = SUPER_Common::email_tags( $settings['register_incorrect_code_msg'], $data, $settings, $user );
                                 $error = true;
                                 $redirect = null;
+                                SUPER_Common::output_error(
+                                    $error = $error,
+                                    $msg = $msg,
+                                    $redirect = $redirect
+                                );
                             }else{
                                 wp_set_current_user($user_id);
                                 wp_set_auth_cookie($user_id);
