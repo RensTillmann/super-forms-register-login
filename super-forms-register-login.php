@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.2.5
+ * Version:     1.2.6
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.2.5';
+        public $version = '1.2.6';
 
 
         /**
@@ -224,7 +224,8 @@ if(!class_exists('SUPER_Register_Login')) :
          *  @since      1.2.0
         */
         public function return_wc_countries($countries, $data) {
-            if( (class_exists('WC_Countries')) && ($data['settings']['register_login_action']=='update') && ( ($data['name']=='billing_country') || ($data['name']=='shipping_country') ) ) {
+            if(!isset($data['settings']['register_login_action'])) $data['settings']['register_login_action'] = '';
+            if( (class_exists('WC_Countries')) && (($data['settings']['register_login_action']=='register') || ($data['settings']['register_login_action']=='update')) && (($data['name']=='billing_country') || ($data['name']=='shipping_country')) ) {
                 $countries_obj = new WC_Countries();
                 $countries = $countries_obj->__get('countries');
                 return $countries;
@@ -629,6 +630,20 @@ if(!class_exists('SUPER_Register_Login')) :
                             'update' => __( 'Update current logged in user', 'super-forms' ),
                         ),
                     ),
+
+                    // @since 1.2.6 - skip registration if user_login or user_email are not found
+                    'register_login_action_skip_register' => array(
+                        'desc' => __( 'Skip registration if user_login or user_email are not found or conditionally hidden', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_action_skip_register', $settings['settings'], '' ),
+                        'type' => 'checkbox',
+                        'values' => array(
+                            'true' => __( 'Skip registration if user_login or user_email are not found', 'super-forms' ),
+                        ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'register'
+                    ),
+
                     'login_user_role' => array(
                         'name' => __( 'Allowed user role(s)', 'super-forms' ),
                         'desc' => __( 'Which user roles are allowed to login?', 'super-forms' ),
@@ -927,217 +942,111 @@ if(!class_exists('SUPER_Register_Login')) :
                 }
             }
 
+
+                
+
             if( $settings['register_login_action']=='register' ) {
 
-                // Before we proceed, lets check if we have at least a user_login and user_email field
-                if( ( !isset( $data['user_login'] ) ) && ( !isset( $data['user_email'] ) ) ) {
-                    $msg = __( 'We couldn\'t find the <strong>user_login</strong> and <strong>user_email</strong> fields which are required in order to register a new user. Please <a href="' . get_admin_url() . 'admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super-forms' );
-                    SUPER_Common::output_error(
-                        $error = true,
-                        $msg = $msg,
-                        $redirect = null
-                    );
-                }
-
-                // Now lets check if a user already exists with the same user_login or user_email
-                $user_login = sanitize_user( $data['user_login']['value'] );
-                $user_email = sanitize_email( $data['user_email']['value'] );
-                
-                $username_exists = username_exists($user_login);
-                if( $username_exists!=false ) {
-                    $user = get_user_by( 'login', $user_login );
-                    $user_login_status = get_user_meta( $user->ID, 'super_user_login_status', true );
-                    if( ($user_login_status=='active') || ($user_login_status=='') ) {
-                        $username_exists = true;
-                    }else{
-                        wp_delete_user( $user->ID );
-                        $username_exists = false;
-                    }
-                }
-
-                $email_exists = email_exists($user_email);        
-                if( $email_exists!=false ) {
-                    $user = get_user_by( 'email', $user_email );
-                    $user_login_status = get_user_meta( $user->ID, 'super_user_login_status', true );
-                    if( ($user_login_status=='active') || ($user_login_status=='') ) {
-                        $email_exists = true;
-                    }else{
-                        wp_delete_user( $user->ID );
-                        $email_exists = false;
-                    }
-                }
-
-                if( ( $username_exists!=false ) || ( $email_exists!=false ) ) {
-                    $msg = __( 'Username or Email address already exists, please try again', 'super-forms' );
-                    SUPER_Common::output_error(
-                        $error = true,
-                        $msg = $msg,
-                        $redirect = null,
-                        $fields = array(
-                            'user_login' => 'input',
-                            'user_pass' => 'input'
-                        )
-                    );
-                }
-
-                // If user_pass field doesn't exist, we can generate one and send it by email to the registered user
-                $send_password = false;
-                if( !isset( $data['user_pass'] ) ) {
-                    $send_password = true;
-                    $password = wp_generate_password();
+                // @since 1.2.6 - skip registration if user_login or user_email couldn't be found or where conditionally hidden
+                if(!isset($settings['register_login_action_skip_register'])) $settings['register_login_action_skip_register'] = '';
+                if( ($settings['register_login_action_skip_register']=='true') && ( (!isset($data['user_login'])) || (!isset($data['user_email'])) ) ) {
+                    // do nothing
                 }else{
-                    $password = $data['user_pass']['value'];
-                }
 
-                // Lets gather all data that we need to insert for this user
-                $userdata = array();
-                $userdata['user_login'] = $user_login;
-                $userdata['user_email'] = $user_email;
-                $userdata['user_pass'] = $password;
-                $userdata['role'] = $settings['register_user_role'];
-                $userdata['user_registered'] = date('Y-m-d H:i:s');
-                $userdata['show_admin_bar_front'] = 'false';
-
-                // Also loop through some of the other default user data that WordPress provides us with out of the box
-                $other_userdata = array(
-                    'user_nicename',
-                    'user_url',
-                    'display_name',
-                    'nickname',
-                    'first_name',
-                    'last_name',
-                    'description',
-                    'rich_editing',
-                    'role', // This is in case we have a custom dropdown with the name "role" which allows users to select their own account type/role
-                    'jabber',
-                    'aim',
-                    'yim'
-                );
-                foreach( $other_userdata as $k ) {
-                    if( isset( $data[$k]['value'] ) ) {
-                        $userdata[$k] = $data[$k]['value'];
-                    }
-                }
-
-                // Insert the user and return the user ID
-                $user_id = wp_insert_user( $userdata );
-                if( is_wp_error( $user_id ) ) {
-                    $msg = $user_id->get_error_message();
-                    $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
-                    SUPER_Common::output_error(
-                        $error = true,
-                        $msg = $msg,
-                        $redirect = null
-                    );
-                }
-
-                // @since v1.0.3 - currently used by the WooCommerce Checkout Add-on
-                do_action( 'super_after_wp_insert_user_action', array( 'user_id'=>$user_id, 'atts'=>$atts ) );
-
-                // Save custom user meta
-                $meta_data = array();
-                $custom_user_meta = explode( "\n", $settings['register_login_user_meta'] );
-                foreach( $custom_user_meta as $k ) {
-                    $field = explode( "|", $k );
-                    if( isset( $data[$field[0]]['value'] ) ) {
-                        $meta_data[$field[1]] = $data[$field[0]]['value'];
-                    }
-                }
-                foreach( $meta_data as $k => $v ) {
-                    update_user_meta( $user_id, $k, $v ); 
-                }
-
-                // @since 1.0.3
-                if( !isset($settings['register_user_signup_status']) ) $settings['register_user_signup_status'] = 'active';
-                update_user_meta( $user_id, 'super_user_login_status', $settings['register_user_signup_status'] );
-
-                // Check if we need to send an activation email to this user
-                if( $settings['register_login_activation']=='verify' ) {
-                    $code = wp_generate_password( 8, false );
-                    
-                    // @since 1.2.4 - allows users to use a custom activation code, for instance generated with the unique random number with a hidden field
-                    if(isset($data['register_activation_code'])){
-                        $code = $data['register_activation_code']['value'];
-                    }
-                    
-                    update_user_meta( $user_id, 'super_account_status', 0 ); // 0 = inactive, 1 = active
-                    update_user_meta( $user_id, 'super_account_activation', $code ); 
-                    $user = get_user_by( 'id', $user_id );
-
-                    // Replace email tags with correct data
-                    $subject = SUPER_Common::email_tags( $settings['register_activation_subject'], $data, $settings, $user );
-                    $message = $settings['register_activation_email'];
-                    $message = str_replace( '{register_login_url}', $settings['register_login_url'], $message );
-                    $message = str_replace( '{register_activation_code}', $code, $message );
-                    $message = str_replace( '{register_generated_password}', $password, $message );
-                    $message = SUPER_Common::email_tags( $message, $data, $settings, $user );
-                    $message = nl2br( $message );
-                    $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings, $user );
-                    $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings, $user );
-                    $attachments = apply_filters( 'super_register_login_before_verify_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$email_body ) );
-
-                    // @since 1.3.0 - custom reply to headers
-                    if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
-                    $reply = '';
-                    $reply_name = '';
-                    if( $settings['header_reply_enabled']==false ) {
-                        $custom_reply = false;
-                    }else{
-                        $custom_reply = true;
-                        if( !isset($settings['header_reply']) ) $settings['header_reply'] = '';
-                        if( !isset($settings['header_reply_name']) ) $settings['header_reply_name'] = '';
-                        $reply = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply'], $data, $settings ) );
-                        $reply_name = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply_name'], $data, $settings ) );
-                    }
-
-                    // Send the email
-                    $mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
-
-                    // Return message
-                    if( !empty( $mail->ErrorInfo ) ) {
+                    // Before we proceed, lets check if we have at least a user_login and user_email field
+                    if( ( !isset( $data['user_login'] ) ) || ( !isset( $data['user_email'] ) ) ) {
+                        $msg = __( 'We couldn\'t find the <strong>user_login</strong> and <strong>user_email</strong> fields which are required in order to register a new user. Please <a href="' . get_admin_url() . 'admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super-forms' );
                         SUPER_Common::output_error(
                             $error = true,
-                            $msg = $mail->ErrorInfo,
+                            $msg = $msg,
                             $redirect = null
                         );
                     }
-                }
-               
-                // @since 1.0.4
-                // Login the user without activating it's account
-                if( $settings['register_login_activation']=='login' ) {
-                    wp_set_current_user( $user_id );
-                    wp_set_auth_cookie( $user_id );
-                    update_user_meta( $user_id, 'super_last_login', time() );
-                }
 
-                // Check if we let users automatically login after registering (instant login)
-                if( $settings['register_login_activation']=='auto' ) {
-                    wp_set_current_user( $user_id );
-                    wp_set_auth_cookie( $user_id );
-                    update_user_meta( $user_id, 'super_last_login', time() );
-                    update_user_meta( $user_id, 'super_account_status', 1 );
-                    update_user_meta( $user_id, 'super_user_login_status', 'active' );
-                }
+                    // Now lets check if a user already exists with the same user_login or user_email
+                    $user_login = sanitize_user( $data['user_login']['value'] );
+                    $user_email = sanitize_email( $data['user_email']['value'] );
+                    
+                    $username_exists = username_exists($user_login);
+                    if( $username_exists!=false ) {
+                        $user = get_user_by( 'login', $user_login );
+                        $user_login_status = get_user_meta( $user->ID, 'super_user_login_status', true );
+                        if( ($user_login_status=='active') || ($user_login_status=='') ) {
+                            $username_exists = true;
+                        }else{
+                            wp_delete_user( $user->ID );
+                            $username_exists = false;
+                        }
+                    }
 
-                // Check if automatically activate users
-                if( $settings['register_login_activation']=='activate' ) {
-                    update_user_meta( $user_id, 'super_account_status', 1 );
-                }
+                    $email_exists = email_exists($user_email);        
+                    if( $email_exists!=false ) {
+                        $user = get_user_by( 'email', $user_email );
+                        $user_login_status = get_user_meta( $user->ID, 'super_user_login_status', true );
+                        if( ($user_login_status=='active') || ($user_login_status=='') ) {
+                            $email_exists = true;
+                        }else{
+                            wp_delete_user( $user->ID );
+                            $email_exists = false;
+                        }
+                    }
 
+                    if( ( $username_exists!=false ) || ( $email_exists!=false ) ) {
+                        $msg = __( 'Username or Email address already exists, please try again', 'super-forms' );
+                        SUPER_Common::output_error(
+                            $error = true,
+                            $msg = $msg,
+                            $redirect = null,
+                            $fields = array(
+                                'user_login' => 'input',
+                                'user_pass' => 'input'
+                            )
+                        );
+                    }
 
-                // @since 1.1.0 - create multi-site
-                if( !isset($settings['register_login_multisite_enabled']) ) $settings['register_login_multisite_enabled'] = '';
-                if( $settings['register_login_multisite_enabled']=='true' ) {
-                    $user = get_user_by( 'id', $user_id );
-                    $domain = SUPER_Common::email_tags( $settings['register_login_multisite_domain'], $data, $settings, $user );
-                    $path = SUPER_Common::email_tags( $settings['register_login_multisite_path'], $data, $settings, $user );
-                    $title = SUPER_Common::email_tags( $settings['register_login_multisite_title'], $data, $settings, $user );
-                    $site_id = SUPER_Common::email_tags( $settings['register_login_multisite_id'], $data, $settings, $user );
-                    $site_meta = apply_filters( 'super_register_login_create_blog_site_meta', array(), $user_id, $meta_data, $atts, $settings );
-                    $blog_id = wpmu_create_blog($domain, $path, $title, $user_id, $site_meta, $site_id);
-                    if( is_wp_error( $blog_id ) ) {
-                        $msg = $blog_id->get_error_message();
+                    // If user_pass field doesn't exist, we can generate one and send it by email to the registered user
+                    $send_password = false;
+                    if( !isset( $data['user_pass'] ) ) {
+                        $send_password = true;
+                        $password = wp_generate_password();
+                    }else{
+                        $password = $data['user_pass']['value'];
+                    }
+
+                    // Lets gather all data that we need to insert for this user
+                    $userdata = array();
+                    $userdata['user_login'] = $user_login;
+                    $userdata['user_email'] = $user_email;
+                    $userdata['user_pass'] = $password;
+                    $userdata['role'] = $settings['register_user_role'];
+                    $userdata['user_registered'] = date('Y-m-d H:i:s');
+                    $userdata['show_admin_bar_front'] = 'false';
+
+                    // Also loop through some of the other default user data that WordPress provides us with out of the box
+                    $other_userdata = array(
+                        'user_nicename',
+                        'user_url',
+                        'display_name',
+                        'nickname',
+                        'first_name',
+                        'last_name',
+                        'description',
+                        'rich_editing',
+                        'role', // This is in case we have a custom dropdown with the name "role" which allows users to select their own account type/role
+                        'jabber',
+                        'aim',
+                        'yim'
+                    );
+                    foreach( $other_userdata as $k ) {
+                        if( isset( $data[$k]['value'] ) ) {
+                            $userdata[$k] = $data[$k]['value'];
+                        }
+                    }
+
+                    // Insert the user and return the user ID
+                    $user_id = wp_insert_user( $userdata );
+                    if( is_wp_error( $user_id ) ) {
+                        $msg = $user_id->get_error_message();
                         $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
                         SUPER_Common::output_error(
                             $error = true,
@@ -1145,14 +1054,130 @@ if(!class_exists('SUPER_Register_Login')) :
                             $redirect = null
                         );
                     }
-                    global $current_site;
-                    if( (!is_super_admin($user_id)) && (get_user_option('primary_blog', $user_id)==$current_site->blog_id) ) {
-                        update_user_option( $user_id, 'primary_blog', $blog_id, true );
+
+                    // @since v1.0.3 - currently used by the WooCommerce Checkout Add-on
+                    do_action( 'super_after_wp_insert_user_action', array( 'user_id'=>$user_id, 'atts'=>$atts ) );
+
+                    // Save custom user meta
+                    $meta_data = array();
+                    $custom_user_meta = explode( "\n", $settings['register_login_user_meta'] );
+                    foreach( $custom_user_meta as $k ) {
+                        $field = explode( "|", $k );
+                        if( isset( $data[$field[0]]['value'] ) ) {
+                            $meta_data[$field[1]] = $data[$field[0]]['value'];
+                        }
                     }
-                    if( $settings['register_login_multisite_email']=='true' ) {
-                        wpmu_welcome_notification( $blog_id, $user_id, $password, $title, array('public'=>1) );
+                    foreach( $meta_data as $k => $v ) {
+                        update_user_meta( $user_id, $k, $v ); 
                     }
-                    do_action( 'super_register_login_after_create_blog', $blog_id );
+
+                    // @since 1.0.3
+                    if( !isset($settings['register_user_signup_status']) ) $settings['register_user_signup_status'] = 'active';
+                    update_user_meta( $user_id, 'super_user_login_status', $settings['register_user_signup_status'] );
+
+                    // Check if we need to send an activation email to this user
+                    if( $settings['register_login_activation']=='verify' ) {
+                        $code = wp_generate_password( 8, false );
+                        
+                        // @since 1.2.4 - allows users to use a custom activation code, for instance generated with the unique random number with a hidden field
+                        if(isset($data['register_activation_code'])){
+                            $code = $data['register_activation_code']['value'];
+                        }
+                        
+                        update_user_meta( $user_id, 'super_account_status', 0 ); // 0 = inactive, 1 = active
+                        update_user_meta( $user_id, 'super_account_activation', $code ); 
+                        $user = get_user_by( 'id', $user_id );
+
+                        // Replace email tags with correct data
+                        $subject = SUPER_Common::email_tags( $settings['register_activation_subject'], $data, $settings, $user );
+                        $message = $settings['register_activation_email'];
+                        $message = str_replace( '{register_login_url}', $settings['register_login_url'], $message );
+                        $message = str_replace( '{register_activation_code}', $code, $message );
+                        $message = str_replace( '{register_generated_password}', $password, $message );
+                        $message = SUPER_Common::email_tags( $message, $data, $settings, $user );
+                        $message = nl2br( $message );
+                        $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings, $user );
+                        $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings, $user );
+                        $attachments = apply_filters( 'super_register_login_before_verify_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$email_body ) );
+
+                        // @since 1.3.0 - custom reply to headers
+                        if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
+                        $reply = '';
+                        $reply_name = '';
+                        if( $settings['header_reply_enabled']==false ) {
+                            $custom_reply = false;
+                        }else{
+                            $custom_reply = true;
+                            if( !isset($settings['header_reply']) ) $settings['header_reply'] = '';
+                            if( !isset($settings['header_reply_name']) ) $settings['header_reply_name'] = '';
+                            $reply = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply'], $data, $settings ) );
+                            $reply_name = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply_name'], $data, $settings ) );
+                        }
+
+                        // Send the email
+                        $mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
+
+                        // Return message
+                        if( !empty( $mail->ErrorInfo ) ) {
+                            SUPER_Common::output_error(
+                                $error = true,
+                                $msg = $mail->ErrorInfo,
+                                $redirect = null
+                            );
+                        }
+                    }
+                   
+                    // @since 1.0.4
+                    // Login the user without activating it's account
+                    if( $settings['register_login_activation']=='login' ) {
+                        wp_set_current_user( $user_id );
+                        wp_set_auth_cookie( $user_id );
+                        update_user_meta( $user_id, 'super_last_login', time() );
+                    }
+
+                    // Check if we let users automatically login after registering (instant login)
+                    if( $settings['register_login_activation']=='auto' ) {
+                        wp_set_current_user( $user_id );
+                        wp_set_auth_cookie( $user_id );
+                        update_user_meta( $user_id, 'super_last_login', time() );
+                        update_user_meta( $user_id, 'super_account_status', 1 );
+                        update_user_meta( $user_id, 'super_user_login_status', 'active' );
+                    }
+
+                    // Check if automatically activate users
+                    if( $settings['register_login_activation']=='activate' ) {
+                        update_user_meta( $user_id, 'super_account_status', 1 );
+                    }
+
+
+                    // @since 1.1.0 - create multi-site
+                    if( !isset($settings['register_login_multisite_enabled']) ) $settings['register_login_multisite_enabled'] = '';
+                    if( $settings['register_login_multisite_enabled']=='true' ) {
+                        $user = get_user_by( 'id', $user_id );
+                        $domain = SUPER_Common::email_tags( $settings['register_login_multisite_domain'], $data, $settings, $user );
+                        $path = SUPER_Common::email_tags( $settings['register_login_multisite_path'], $data, $settings, $user );
+                        $title = SUPER_Common::email_tags( $settings['register_login_multisite_title'], $data, $settings, $user );
+                        $site_id = SUPER_Common::email_tags( $settings['register_login_multisite_id'], $data, $settings, $user );
+                        $site_meta = apply_filters( 'super_register_login_create_blog_site_meta', array(), $user_id, $meta_data, $atts, $settings );
+                        $blog_id = wpmu_create_blog($domain, $path, $title, $user_id, $site_meta, $site_id);
+                        if( is_wp_error( $blog_id ) ) {
+                            $msg = $blog_id->get_error_message();
+                            $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
+                            SUPER_Common::output_error(
+                                $error = true,
+                                $msg = $msg,
+                                $redirect = null
+                            );
+                        }
+                        global $current_site;
+                        if( (!is_super_admin($user_id)) && (get_user_option('primary_blog', $user_id)==$current_site->blog_id) ) {
+                            update_user_option( $user_id, 'primary_blog', $blog_id, true );
+                        }
+                        if( $settings['register_login_multisite_email']=='true' ) {
+                            wpmu_welcome_notification( $blog_id, $user_id, $password, $title, array('public'=>1) );
+                        }
+                        do_action( 'super_register_login_after_create_blog', $blog_id );
+                    }
                 }
             }
 
