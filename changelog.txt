@@ -1,3 +1,7 @@
+Nov 15, 2017 - Version 1.2.7
+- Added: Option to send Approve email after admin approves the user account via back-end
+- Added: Option to generate password on the fly when admin approves user account
+
 Sep 15, 2017 - Version 1.2.6
 - Added: Option to skip registration if user_login or user_email are not found
 

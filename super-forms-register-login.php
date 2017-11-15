@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.2.6
+ * Version:     1.2.7
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.2.6';
+        public $version = '1.2.7';
 
 
         /**
@@ -426,6 +426,72 @@ if(!class_exists('SUPER_Register_Login')) :
          * @since      1.0.3
          */
         public function save_customer_meta_fields( $user_id ) {
+
+            // Get form data and settings
+            $form_data = get_user_meta( $user_id, 'super_user_approve_data', true );
+            if( ($form_data!='') && (isset($_POST['super_user_login_status'])) ) {
+                $settings = $form_data['settings'];
+                $data = $form_data['data'];
+                $user_status = get_user_meta( $user_id, 'super_user_login_status', true );
+                if( ($user_status!='active') && ($_POST['super_user_login_status']=='active') ) {
+                    if( (!empty($settings['register_approve_subject'])) && (!empty($settings['register_approve_email'])) ) {
+                        $user = get_user_by( 'ID', $user_id );
+                        if( $user ) {
+                            $username = $user->user_login;
+                            $user_email = $user->user_email;
+                            $name = $user->display_name;
+
+                            // Replace email tags with correct data
+                            $subject = SUPER_Common::email_tags( $settings['register_approve_subject'], $data, $settings );
+                            $message = $settings['register_approve_email'];
+                            $message = str_replace( '{field_user_login}', $username, $message );
+                            $message = str_replace( '{user_login}', $username, $message );
+                            $message = str_replace( '{register_login_url}', $settings['register_login_url'], $message );
+
+                            // Generate a password upon approval
+                            if( (isset($settings['register_approve_generate_pass'])) && ($settings['register_approve_generate_pass']=='true') ) {
+                                add_filter( 'send_password_change_email', '__return_false' );
+                                $password = wp_generate_password();
+                                $user_id = wp_update_user( array( 'ID' => $user->ID, 'user_pass' => $password ) );
+                                $message = str_replace( '{field_user_pass}', $password, $message );
+                                $message = str_replace( '{user_pass}', $password, $message );
+                                $message = str_replace( '{register_generated_password}', $password, $message );
+                            }
+
+                            $message = SUPER_Common::email_tags( $message, $data, $settings );
+                            $message = nl2br( $message );
+                            $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings );
+                            $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings );
+                            $attachments = apply_filters( 'super_register_login_before_resend_activation_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$message ) );
+
+                            if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
+                            $reply = '';
+                            $reply_name = '';
+                            if( $settings['header_reply_enabled']==false ) {
+                                $custom_reply = false;
+                            }else{
+                                $custom_reply = true;
+                                if( !isset($settings['header_reply']) ) $settings['header_reply'] = '';
+                                if( !isset($settings['header_reply_name']) ) $settings['header_reply_name'] = '';
+                                $reply = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply'], $data, $settings ) );
+                                $reply_name = SUPER_Common::decode_email_header( SUPER_Common::email_tags( $settings['header_reply_name'], $data, $settings ) );
+                            }
+
+                            // Send the email
+                            $mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
+                         
+                            // After email is send, delete the email and subject (remove the password from database for security reasons)
+                            if( empty( $mail->ErrorInfo ) ) {
+                                delete_user_meta( $user_id, 'super_user_approve_data' );          
+                            }
+
+                            exit;
+
+                        }
+                    }
+                }
+            }
+
             $save_fields = $this->get_customer_meta_fields();
             foreach ( $save_fields as $fieldset ) {
                 foreach ( $fieldset['fields'] as $key => $field ) {
@@ -679,6 +745,52 @@ if(!class_exists('SUPER_Register_Login')) :
                             'blocked' => __( 'Blocked', 'super-forms' ),
                         ),
                     ),
+
+                    // @since 1.2.7 - Send activation email when account is activated by admin
+                    'register_send_approve_email' => array(
+                        'desc' => __( 'When admin approves registration this email will be send to the user', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_send_activation_email', $settings['settings'], '' ),
+                        'type' => 'checkbox',
+                        'values' => array(
+                            'true' => __( 'Send approve email when account is activated by admin', 'super-forms' ),
+                        ),
+                        'filter' => true,
+                        'parent' => 'register_user_signup_status',
+                        'filter_value' => 'pending,blocked'
+                    ),
+                    'register_approve_subject' => array(
+                        'name' => __( 'Approved Email Subject', 'super-forms' ),
+                        'desc' => __( 'Example: Your account has been approved', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_approve_subject', $settings['settings'], __( 'Account has been approved', 'super-forms' ) ),
+                        'filter' => true,
+                        'parent' => 'register_send_approve_email',
+                        'filter_value' => 'true',
+                    ),
+                    'register_approve_email' => array(
+                        'name' => __( 'Approved Email Body', 'super-forms' ),
+                        'desc' => __( 'The email message.', 'super-forms' ),
+                        'type' => 'textarea',
+                        'default' => SUPER_Settings::get_value( 0, 'register_approve_email', $settings['settings'], "Dear {user_login},\n\nYour account has been approved and can now be used!\n\nUsername: <strong>{user_login}</strong>\nPassword: <strong>{user_pass}</strong>\n\nClick <a href=\"{register_login_url}\">here</a> to login into your account.\n\n\nBest regards,\n\n{option_blogname}" ),
+                        'filter' => true,
+                        'parent' => 'register_send_approve_email',
+                        'filter_value' => 'true',
+                    ),
+                    'register_approve_generate_pass' => array(
+                        'desc' => __( 'This will generate a new password as soon as the user account has been approved', 'super-forms' ),
+                        'label' => __( 'You can retrieve the generated password with {register_generated_password} in the email', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_approve_generate_pass', $settings['settings'], '' ),
+                        'type' => 'checkbox',
+                        'values' => array(
+                            'true' => __( 'Generate new password on the fly when sending approve email', 'super-forms' ),
+                        ),
+                        'filter' => true,
+                        'parent' => 'register_send_approve_email',
+                        'filter_value' => 'true'
+                    ),
+
+                    
+
+
                     'register_login_activation' => array(
                         'name' => __( 'Send activation email', 'super-forms' ),
                         'desc' => __( 'Optionally let users activate their account or let them instantly login without verification', 'super-forms' ),
@@ -706,7 +818,7 @@ if(!class_exists('SUPER_Register_Login')) :
                     'register_welcome_back_msg' => array(
                         'name' => __( 'Welcome back message', 'super-forms' ),
                         'desc' => __( 'Display a welcome message after user has logged in (leave blank for no message)', 'super-forms' ),
-                        'default' => SUPER_Settings::get_value( 0, 'register_welcome_back_msg', $settings['settings'], __( 'Welcome back {field_user_login}!', 'super-forms' ) ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_welcome_back_msg', $settings['settings'], __( 'Welcome back {user_login}!', 'super-forms' ) ),
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'login',
@@ -722,7 +834,7 @@ if(!class_exists('SUPER_Register_Login')) :
                     'register_account_activated_msg' => array(
                         'name' => __( 'Account activated message', 'super-forms' ),
                         'desc' => __( 'Display a message when account has been activated', 'super-forms' ),
-                        'default' => SUPER_Settings::get_value( 0, 'register_account_activated_msg', $settings['settings'], __( 'Hello {field_user_login}, your account has been activated!', 'super-forms' ) ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_account_activated_msg', $settings['settings'], __( 'Hello {user_login}, your account has been activated!', 'super-forms' ) ),
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'login',
@@ -739,7 +851,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'name' => __( 'Activation Email Body', 'super-forms' ),
                         'desc' => __( 'The email message. You can use {activation_code} and {register_login_url}', 'super-forms' ),
                         'type' => 'textarea',
-                        'default' => SUPER_Settings::get_value( 0, 'register_activation_email', $settings['settings'], "Dear {field_user_login},\n\nThank you for registering! Before you can login you will need to activate your account.\nBelow you will find your activation code. You need this code to activate your account:\n\nActivation Code: <strong>{register_activation_code}</strong>\n\nClick <a href=\"{register_login_url}?code={register_activation_code}\">here</a> to activate your account with the provided code.\n\n\nBest regards,\n\n{option_blogname}" ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_activation_email', $settings['settings'], "Dear {user_login},\n\nThank you for registering! Before you can login you will need to activate your account.\nBelow you will find your activation code. You need this code to activate your account:\n\nActivation Code: <strong>{register_activation_code}</strong>\n\nClick <a href=\"{register_login_url}?code={register_activation_code}\">here</a> to activate your account with the provided code.\n\n\nBest regards,\n\n{option_blogname}" ),
                         'filter' => true,
                         'parent' => 'register_login_activation',
                         'filter_value' => 'verify',
@@ -1047,7 +1159,8 @@ if(!class_exists('SUPER_Register_Login')) :
                     $user_id = wp_insert_user( $userdata );
                     if( is_wp_error( $user_id ) ) {
                         $msg = $user_id->get_error_message();
-                        $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
+
+                        SUPER_Forms()->session->set( 'super_msg', array( 'data'=>$data, 'settings'=>$settings, 'msg'=>$msg, 'type'=>'error' ) );
                         SUPER_Common::output_error(
                             $error = true,
                             $msg = $msg,
@@ -1075,6 +1188,10 @@ if(!class_exists('SUPER_Register_Login')) :
                     if( !isset($settings['register_user_signup_status']) ) $settings['register_user_signup_status'] = 'active';
                     update_user_meta( $user_id, 'super_user_login_status', $settings['register_user_signup_status'] );
 
+                    if( (isset($settings['register_send_approve_email'])) && ($settings['register_send_approve_email']=='true') ) {
+                        update_user_meta( $user_id, 'super_user_approve_data', array('settings'=>$settings, 'data'=>$data) );
+                    }
+
                     // Check if we need to send an activation email to this user
                     if( $settings['register_login_activation']=='verify' ) {
                         $code = wp_generate_password( 8, false );
@@ -1098,7 +1215,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         $message = nl2br( $message );
                         $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings, $user );
                         $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings, $user );
-                        $attachments = apply_filters( 'super_register_login_before_verify_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$email_body ) );
+                        $attachments = apply_filters( 'super_register_login_before_verify_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$message ) );
 
                         // @since 1.3.0 - custom reply to headers
                         if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
@@ -1162,7 +1279,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         $blog_id = wpmu_create_blog($domain, $path, $title, $user_id, $site_meta, $site_id);
                         if( is_wp_error( $blog_id ) ) {
                             $msg = $blog_id->get_error_message();
-                            $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
+                            SUPER_Forms()->session->set( 'super_msg', array( 'data'=>$data, 'settings'=>$settings, 'msg'=>$msg, 'type'=>'error' ) );
                             SUPER_Common::output_error(
                                 $error = true,
                                 $msg = $msg,
@@ -1233,7 +1350,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         if( ( !isset( $data['activation_code'] ) ) && ( $status==0 ) && ( $status!='' ) ) {
                             wp_logout();
                             $msg = sprintf( __( 'You haven\'t activated your account yet. Please check your email or click <a href="#" class="resend-code" data-form="%d" data-user="%s">here</a> to resend your activation email.', 'super-forms' ), absint( $atts['post']['form_id'] ), $user->user_login );
-                            $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'error' );
+                            SUPER_Forms()->session->set( 'super_msg', array( 'data'=>$data, 'settings'=>$settings, 'msg'=>$msg, 'type'=>'error' ) );
                             SUPER_Common::output_error(
                                 $error = true,
                                 $msg = $msg,
@@ -1290,7 +1407,7 @@ if(!class_exists('SUPER_Register_Login')) :
                                 $msg = SUPER_Common::email_tags( $settings['register_account_activated_msg'], $data, $settings, $user );
                             }
                         }
-                        $_SESSION['super_msg'] = array( 'msg'=>$msg, 'type'=>'success' );
+                        SUPER_Forms()->session->set( 'super_msg', array( 'data'=>$data, 'settings'=>$settings, 'msg'=>$msg, 'type'=>'success' ) );
                         SUPER_Common::output_error(
                             $error = $error,
                             $msg = $msg,
@@ -1364,7 +1481,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 $message = nl2br( $message );
                 $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings, $user );
                 $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings, $user );
-                $attachments = apply_filters( 'super_register_login_before_sending_reset_password_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$email_body ) );
+                $attachments = apply_filters( 'super_register_login_before_sending_reset_password_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$message ) );
 
                 // @since 1.3.0 - custom reply to headers
                 if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
@@ -1431,6 +1548,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 $subject = SUPER_Common::email_tags( $settings['register_activation_subject'], $data, $settings );
                 $message = $settings['register_activation_email'];
                 $message = str_replace( '{field_user_login}', $username, $message );
+                $message = str_replace( '{user_login}', $username, $message );
                 $message = str_replace( '{register_login_url}', $settings['register_login_url'], $message );
                 $message = str_replace( '{register_activation_code}', $code, $message );
                 $message = str_replace( '{register_generated_password}', $password, $message );
@@ -1438,7 +1556,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 $message = nl2br( $message );
                 $from = SUPER_Common::email_tags( $settings['header_from'], $data, $settings );
                 $from_name = SUPER_Common::email_tags( $settings['header_from_name'], $data, $settings );
-                $attachments = apply_filters( 'super_register_login_before_resend_activation_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$email_body ) );
+                $attachments = apply_filters( 'super_register_login_before_resend_activation_attachments_filter', array(), array( 'settings'=>$settings, 'data'=>$data, 'email_body'=>$message ) );
 
                 // @since 1.3.0 - custom reply to headers
                 if( !isset($settings['header_reply_enabled']) ) $settings['header_reply_enabled'] = false;
