@@ -1,4 +1,4 @@
-Nov 15, 2017 - Version 1.2.7
+Nov 16, 2017 - Version 1.2.7
 - Added: Option to send Approve email after admin approves the user account via back-end
 - Added: Option to generate password on the fly when admin approves user account
 
