@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.2.7
+ * Version:     1.3.0
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.2.7';
+        public $version = '1.3.0';
 
 
         /**
@@ -212,6 +212,10 @@ if(!class_exists('SUPER_Register_Login')) :
 
                 // Actions since 1.0.0
                 add_action( 'super_before_sending_email_hook', array( $this, 'before_sending_email' ) );
+
+                // Actions since 1.3.0
+                add_action( 'super_before_email_success_msg_action', array( $this, 'before_email_success_msg' ) );
+
 
             }
             
@@ -858,7 +862,7 @@ if(!class_exists('SUPER_Register_Login')) :
                     ),                                      
                     'register_login_user_meta' => array(
                         'name' => __( 'Save custom user meta', 'super-forms' ),
-                        'desc' => __( 'Usefull for external plugins such as WooCommerce. Example: "field_name|meta_key" (each on a new line)', 'super-forms' ),
+                        'desc' => __( 'Usefull for external plugins such as WooCommerce. Example: \'field_name|meta_key\' (each on a new line)', 'super-forms' ),
                         'type' => 'textarea',
                         'default' => SUPER_Settings::get_value( 0, 'register_login_user_meta', $settings['settings'], "billing_first_name|billing_first_name\nbilling_last_name|billing_last_name\nbilling_company|billing_company\nbilling_address_1|billing_address_1\nbilling_address_2|billing_address_2\nbilling_city|billing_city\nbilling_postcode|billing_postcode\nbilling_country|billing_country\nbilling_state|billing_state\nbilling_phone|billing_phone\nbilling_email|billing_email\nshipping_first_name|shipping_first_name\nshipping_last_name|shipping_last_name\nshipping_company|shipping_company\nshipping_address_1|shipping_address_1\nshipping_address_2|shipping_address_2\nshipping_city|shipping_city\nshipping_postcode|shipping_postcode\nshipping_country|shipping_country\nshipping_state|shipping_state" ),
                         'filter' => true,
@@ -983,6 +987,183 @@ if(!class_exists('SUPER_Register_Login')) :
 
 
         /**
+         * Make sure to update user meta data after possible uploaded file(s) have been saved into media library
+         * otherwise we are unable to return/save the file ID correctly
+         *
+         *  @since      1.3.0
+        */
+        public static function before_email_success_msg( $atts ) {
+
+            $settings = $atts['settings'];
+            $data = $atts['data'];
+
+            // @since 1.2.0 - update existing user data
+            if( $settings['register_login_action']=='update' ) {
+                $user_id = SUPER_Forms()->session->get( 'super_update_user_meta' );
+                $user_id = absint($user_id);
+                if( $user_id!=0 ) {
+                    SUPER_Forms()->session->set( 'super_update_user_meta', false );
+
+                    // Loop through all default user data that WordPress provides us with out of the box
+                    $userdata = array(
+                        'user_login',
+                        'user_email',
+                        'user_pass',
+                        'user_registered',
+                        'show_admin_bar_front',
+                        'user_nicename',
+                        'user_url',
+                        'display_name',
+                        'nickname',
+                        'first_name',
+                        'last_name',
+                        'description',
+                        'rich_editing',
+                        'role', // This is in case we have a custom dropdown with the name "role" which allows users to select their own account type/role
+                        'jabber',
+                        'aim',
+                        'yim'
+                    );
+                    foreach( $userdata as $k ) {
+                        if( isset( $data[$k]['value'] ) ) {
+                            $value = $data[$k]['value'];
+                            if( $k=='user_login' ) $value = sanitize_user($value);
+                            if( $k=='user_email' ) $value = sanitize_email($value);
+                            $userdata[$k] = $value;
+                        }
+                    }
+                    
+                    $userdata['ID'] = $user_id;
+                    wp_update_user( $userdata );
+
+                    // Save custom user meta
+                    $meta_data = array();
+                    $custom_user_meta = explode( "\n", $settings['register_login_update_user_meta'] );
+                    foreach( $custom_user_meta as $k ) {
+                        $field = explode( "|", $k );
+                        if( isset( $data[$field[0]]['value'] ) ) {
+                            $meta_data[$field[1]] = $data[$field[0]]['value'];
+                        }
+                    }
+
+                    foreach( $meta_data as $k => $v ) {
+                        update_user_meta( $user_id, $k, $v ); 
+                    }
+                }
+            }
+
+            if( $settings['register_login_action']=='register' ) {
+                $user_id = SUPER_Forms()->session->get( 'super_update_user_meta' );
+                $user_id = absint($user_id);
+                if( $user_id!=0 ) {
+                    SUPER_Forms()->session->set( 'super_update_user_meta', false );
+
+                    // Save custom user meta
+                    $meta_data = array();
+                    $custom_meta = explode( "\n", $settings['register_login_user_meta'] );
+                    foreach( $custom_meta as $k ) {
+                        $field = explode( "|", $k );
+                        // @since 1.0.3 - first check if a field with the name exists
+                        if( isset( $data[$field[0]]['value'] ) ) {
+                            $meta_data[$field[1]] = $data[$field[0]]['value'];
+                        }else{
+                            
+                            // @since 1.1.2 - check if type is files
+                            if( (!empty($data[$field[0]])) && ( ($data[$field[0]]['type']=='files') && (isset($data[$field[0]]['files'])) ) ) {
+                                if( count($data[$field[0]]['files']>1) ) {
+                                    foreach( $data[$field[0]]['files'] as $fk => $fv ) {
+                                        if($meta_data[$field[1]]==''){
+                                            $meta_data[$field[1]] = $fv['attachment'];
+                                        }else{
+                                            $meta_data[$field[1]] .= ',' . $fv['attachment'];
+                                        }
+                                    }
+                                }elseif( count($data[$field[0]]['files'])==1) {
+                                    $meta_data[$field[1]] = absint($data[$field[0]]['files'][0]['attachment']);
+                                }else{
+                                    $meta_data[$field[1]] = '';
+                                }
+                                continue;
+                            }else{
+                                // @since 1.0.3 - if no field exists, just save it as a string
+                                $string = SUPER_Common::email_tags( $field[0], $data, $settings );
+                                
+                                // @since 1.0.3 - check if string is serialized array
+                                $unserialize = @unserialize($string);
+                                if ($unserialize !== false) {
+                                    $meta_data[$field[1]] = $unserialize;
+                                }else{
+                                    $meta_data[$field[1]] = $string;
+                                }
+                            }
+                        }
+                    }
+
+                    foreach( $meta_data as $k => $v ) {
+                        // @since 1.1.1 - Check for ACF field and check if checkbox, if checkbox save values as Associative Array
+                        if (function_exists('get_field_object')) {
+                            global $wpdb;
+                            $length = strlen($k);
+
+                            // @since 1.1.2 - Because there are major differences between ACF Pro and the regular ACF plugin we have to do different queries
+                            if( class_exists('acf_pro') ) {
+                                $sql = "SELECT post_name FROM {$wpdb->posts} WHERE post_excerpt = '$k' AND post_type = 'acf-field'";
+                            }else{
+                                $sql = "SELECT meta_key FROM {$wpdb->postmeta} WHERE meta_key LIKE 'field_%' AND meta_value LIKE '%\"name\";s:$length:\"$k\";%';";
+                            }
+                            $acf_field = $wpdb->get_var($sql);
+                            $acf_field = get_field_object($acf_field);
+
+                            // @since 1.1.3 - save a checkbox or select value
+                            if( ($acf_field['type']=='checkbox') || ($acf_field['type']=='select') || ($acf_field['type']=='radio') || ($acf_field['type']=='gallery') ) {
+                                $value = explode( ",", $v );
+                                update_field( $acf_field['key'], $value, 'user_'.$user_id );
+                                continue;
+                            }elseif( $acf_field['type']=='google_map' ) {
+                                if( isset($data[$k]['geometry']) ) {
+                                    $data[$k]['geometry']['location']['address'] = $data[$k]['value'];
+                                    $value = $data[$k]['geometry']['location'];
+                                }else{
+                                    $value = array(
+                                        'address' => $data[$k]['value'],
+                                        'lat' => '',
+                                        'lng' => '',
+                                    );
+                                }
+                                update_field( $acf_field['key'], $value, 'user_'.$user_id );
+                                continue;
+                            }
+
+                            // @since 1.1.3 - save a repeater field value
+                            if($acf_field['type']=='repeater'){
+                                $repeater_values = array();
+                                foreach($acf_field['sub_fields'] as $sk => $sv){
+                                    if( isset($data[$sv['name']]) ) {
+                                        $repeater_values[0][$sv['name']] = $this->return_field_value( $data, $sv['name'], $sv['type'], $settings );
+                                        $field_counter = 2;
+                                        while( isset($data[$sv['name'] . '_' . $field_counter]) ) {
+                                            $repeater_values[$field_counter-1][$sv['name']] = $this->return_field_value( $data, $sv['name'] . '_' . $field_counter, $sv['type'], $settings );
+                                            $field_counter++;
+                                        }
+                                    }
+                                }
+                                update_field( $acf_field['key'], $repeater_values, 'user_'.$user_id );
+                                continue;
+                            }
+
+                            // save a basic text value
+                            update_field( $acf_field['key'], $v, 'user_'.$user_id );
+                            continue;
+
+                        }
+                        update_user_meta( $user_id, $k, $v ); 
+                    }
+                }
+            }
+        }
+
+
+        /**
          * Hook into before sending email and check if we need to register or login a user
          *
          *  @since      1.0.0
@@ -1007,55 +1188,11 @@ if(!class_exists('SUPER_Register_Login')) :
                     );
                 }
 
-                // Loop through all default user data that WordPress provides us with out of the box
-                $userdata = array(
-                    'user_login',
-                    'user_email',
-                    'user_pass',
-                    'user_registered',
-                    'show_admin_bar_front',
-                    'user_nicename',
-                    'user_url',
-                    'display_name',
-                    'nickname',
-                    'first_name',
-                    'last_name',
-                    'description',
-                    'rich_editing',
-                    'role', // This is in case we have a custom dropdown with the name "role" which allows users to select their own account type/role
-                    'jabber',
-                    'aim',
-                    'yim'
-                );
-                foreach( $userdata as $k ) {
-                    if( isset( $data[$k]['value'] ) ) {
-                        $value = $data[$k]['value'];
-                        if( $k=='user_login' ) $value = sanitize_user($value);
-                        if( $k=='user_email' ) $value = sanitize_email($value);
-                        $userdata[$k] = $value;
-                    }
-                }
+                // @since 1.3.0 - save user meta after possible file(s) have been processed and saved into media library
                 $user_id = get_current_user_id();
-                $userdata['ID'] = $user_id;
-                wp_update_user( $userdata );
+                SUPER_Forms()->session->set( 'super_update_user_meta', $user_id );
 
-                // Save custom user meta
-                $meta_data = array();
-                $custom_user_meta = explode( "\n", $settings['register_login_update_user_meta'] );
-                foreach( $custom_user_meta as $k ) {
-                    $field = explode( "|", $k );
-                    if( isset( $data[$field[0]]['value'] ) ) {
-                        $meta_data[$field[1]] = $data[$field[0]]['value'];
-                    }
-                }
-
-                foreach( $meta_data as $k => $v ) {
-                    update_user_meta( $user_id, $k, $v ); 
-                }
             }
-
-
-                
 
             if( $settings['register_login_action']=='register' ) {
 
@@ -1170,19 +1307,9 @@ if(!class_exists('SUPER_Register_Login')) :
 
                     // @since v1.0.3 - currently used by the WooCommerce Checkout Add-on
                     do_action( 'super_after_wp_insert_user_action', array( 'user_id'=>$user_id, 'atts'=>$atts ) );
-
-                    // Save custom user meta
-                    $meta_data = array();
-                    $custom_user_meta = explode( "\n", $settings['register_login_user_meta'] );
-                    foreach( $custom_user_meta as $k ) {
-                        $field = explode( "|", $k );
-                        if( isset( $data[$field[0]]['value'] ) ) {
-                            $meta_data[$field[1]] = $data[$field[0]]['value'];
-                        }
-                    }
-                    foreach( $meta_data as $k => $v ) {
-                        update_user_meta( $user_id, $k, $v ); 
-                    }
+       
+                    // @since 1.3.0 - save user meta after possible file(s) have been processed and saved into media library
+                    SUPER_Forms()->session->set( 'super_update_user_meta', $user_id );
 
                     // @since 1.0.3
                     if( !isset($settings['register_user_signup_status']) ) $settings['register_user_signup_status'] = 'active';
