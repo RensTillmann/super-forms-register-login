@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.3.0
+ * Version:     1.4.0
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.3.0';
+        public $version = '1.4.0';
 
 
         /**
@@ -701,6 +701,18 @@ if(!class_exists('SUPER_Register_Login')) :
                         ),
                     ),
 
+                    // @since 1.4.0 - option to register new user if user doesn't exists while updating user
+                    'register_login_register_not_exists' => array(
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_register_not_exists', $settings['settings'], '' ),
+                        'type' => 'checkbox',
+                        'values' => array(
+                            'true' => __( 'Register new user if user doesn\'t exists yet', 'super-forms' ),
+                        ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'update'
+                    ),
+
                     // @since 1.2.6 - skip registration if user_login or user_email are not found
                     'register_login_action_skip_register' => array(
                         'desc' => __( 'Skip registration if user_login or user_email are not found or conditionally hidden', 'super-forms' ),
@@ -978,8 +990,6 @@ if(!class_exists('SUPER_Register_Login')) :
                         'parent' => 'register_login_action',
                         'filter_value' => 'update',
                     ),
-
-
                 )
             );
             return $array;
@@ -1048,6 +1058,11 @@ if(!class_exists('SUPER_Register_Login')) :
 
                     foreach( $meta_data as $k => $v ) {
                         update_user_meta( $user_id, $k, $v ); 
+                    }
+                }else{
+                    // @since 1.4.0 - register new user if user doesn't exists while updating user
+                    if( (!empty($settings['register_login_register_not_exists'])) && ($settings['register_login_register_not_exists']=='true') ) {
+                        $settings['register_login_action'] = 'register';
                     }
                 }
             }
