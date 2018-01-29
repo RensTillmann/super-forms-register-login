@@ -1,3 +1,6 @@
+Jan 14, 2018 - Version 1.5.0
+- Added: Option to Update user based on user_id field or GET or POST, A hidden field named "user_id" must be present in your form in order for this to work
+
 Jan 8, 2018 - Version 1.4.0
 - Added: Option to register new user if user doesn't exists while updating user
 

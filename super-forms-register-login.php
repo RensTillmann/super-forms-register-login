@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.4.0
+ * Version:     1.5.0
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.4.0';
+        public $version = '1.5.0';
 
 
         /**
@@ -627,7 +627,22 @@ if(!class_exists('SUPER_Register_Login')) :
             // Include the predefined arrays
             require(SUPER_PLUGIN_DIR.'/includes/shortcodes/predefined-arrays.php' );
 
+            $array['form_elements']['shortcodes']['activation_code_predefined'] = array(
+                'name' => __( 'Activation Code', 'super-forms' ),
+                'icon' => 'code',
+                'predefined' => array(
+                    array(
+                        'tag' => 'activation_code',
+                        'group' => 'form_elements',
+                        'data' => array(
+                            'placeholder' => '[-CODE-]',
+                            'icon' => 'code',
+                        )
+                    )
+                )
+            );
             $array['form_elements']['shortcodes']['activation_code'] = array(
+                'hidden' => true,
                 'callback' => 'SUPER_Register_Login::activation_code',
                 'name' => __( 'Activation Code', 'super-forms' ),
                 'icon' => 'code',
@@ -637,7 +652,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'fields' => array(
                             'label' => $label,
                             'description'=> $description,
-                            'placeholder' => SUPER_Shortcodes::placeholder( $attributes, '[-CODE-]' ),
+                            'placeholder' => SUPER_Shortcodes::placeholder( $attributes, '' ),
                             'tooltip' => $tooltip,
                         )
                     ),
@@ -702,11 +717,25 @@ if(!class_exists('SUPER_Register_Login')) :
                     ),
 
                     // @since 1.4.0 - option to register new user if user doesn't exists while updating user
-                    'register_login_register_not_exists' => array(
-                        'default' => SUPER_Settings::get_value( 0, 'register_login_register_not_exists', $settings['settings'], '' ),
+                    'register_login_register_not_logged_in' => array(
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_register_not_logged_in', $settings['settings'], '' ),
                         'type' => 'checkbox',
                         'values' => array(
-                            'true' => __( 'Register new user if user doesn\'t exists yet', 'super-forms' ),
+                            'true' => __( 'Register new user if user is not logged in', 'super-forms' ),
+                        ),
+                        'filter' => true,
+                        'parent' => 'register_login_action',
+                        'filter_value' => 'update'
+                    ),
+
+                    // @since 1.5.0 - option to update user based on user_id field (if exists or if it's set via GET or POST)
+                    'register_login_user_id_update' => array(
+                        'name' => __( 'Update based on user ID (user_id)', 'super-forms' ),
+                        'label' => __( 'A hidden field named "user_id" must be present in your form in order for this to work', 'super-forms' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_login_user_id_update', $settings['settings'], '' ),
+                        'type' => 'checkbox',
+                        'values' => array(
+                            'true' => __( 'Update user based on user_id field or GET or POST', 'super-forms' ),
                         ),
                         'filter' => true,
                         'parent' => 'register_login_action',
@@ -1061,7 +1090,7 @@ if(!class_exists('SUPER_Register_Login')) :
                     }
                 }else{
                     // @since 1.4.0 - register new user if user doesn't exists while updating user
-                    if( (!empty($settings['register_login_register_not_exists'])) && ($settings['register_login_register_not_exists']=='true') ) {
+                    if( (!empty($settings['register_login_register_not_logged_in'])) && ($settings['register_login_register_not_logged_in']=='true') ) {
                         $settings['register_login_action'] = 'register';
                     }
                 }
@@ -1193,19 +1222,29 @@ if(!class_exists('SUPER_Register_Login')) :
             // @since 1.2.0 - update existing user data
             if( $settings['register_login_action']=='update' ) {
 
-                // Before proceeding, check if a user is logged in
-                if ( !is_user_logged_in() ) {
-                    $msg = $settings['register_login_not_logged_in_msg'];
-                    SUPER_Common::output_error(
-                        $error = true,
-                        $msg = $msg,
-                        $redirect = null
-                    );
-                }
-
-                // @since 1.3.0 - save user meta after possible file(s) have been processed and saved into media library
+                // @since 1.5.0 - option to update user based on user_id field (if exists or if it's set via GET or POST)
                 $user_id = get_current_user_id();
-                SUPER_Forms()->session->set( 'super_update_user_meta', $user_id );
+                if( (!empty($settings['register_login_user_id_update'])) && ($settings['register_login_user_id_update']=='true') ) {
+                    if( (isset($data['user_id']['value'])) && (absint($data['user_id']['value'])!=0) ) {
+                        $user_id = absint($data['user_id']['value']);
+                    }
+                }
+                if( $user_id==0 ) {
+                    // @since 1.4.0 - do not throw error message when we allow none logged in users to register
+                    if( (!empty($settings['register_login_register_not_logged_in'])) && ($settings['register_login_register_not_logged_in']=='true') ) {
+                        $settings['register_login_action'] = 'register';
+                    }else{
+                        $msg = $settings['register_login_not_logged_in_msg'];
+                        SUPER_Common::output_error(
+                            $error = true,
+                            $msg = $msg,
+                            $redirect = null
+                        );
+                    }
+                }else{
+                    // @since 1.3.0 - save user meta after possible file(s) have been processed and saved into media library
+                    SUPER_Forms()->session->set( 'super_update_user_meta', $user_id );
+                }
 
             }
 
