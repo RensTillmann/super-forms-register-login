@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.5.0
+ * Version:     1.5.1
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.5.0';
+        public $version = '1.5.1';
 
 
         /**
@@ -810,6 +810,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_send_approve_email',
                         'filter_value' => 'true',
+                        'allow_empty' => true,
                     ),
                     'register_approve_email' => array(
                         'name' => __( 'Approved Email Body', 'super-forms' ),
@@ -819,6 +820,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_send_approve_email',
                         'filter_value' => 'true',
+                        'allow_empty' => true,
                     ),
                     'register_approve_generate_pass' => array(
                         'desc' => __( 'This will generate a new password as soon as the user account has been approved', 'super-forms' ),
@@ -859,6 +861,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'register,login,reset_password,update',
+                        'allow_empty' => true,
                     ),
                     'register_welcome_back_msg' => array(
                         'name' => __( 'Welcome back message', 'super-forms' ),
@@ -867,6 +870,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'login',
+                        'allow_empty' => true,
                     ),
                     'register_incorrect_code_msg' => array(
                         'name' => __( 'Incorrect activation code message', 'super-forms' ),
@@ -875,6 +879,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'login',
+                        'allow_empty' => true,
                     ),
                     'register_account_activated_msg' => array(
                         'name' => __( 'Account activated message', 'super-forms' ),
@@ -883,6 +888,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'login',
+                        'allow_empty' => true,
                     ),
                     'register_activation_subject' => array(
                         'name' => __( 'Activation Email Subject', 'super-forms' ),
@@ -891,6 +897,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_activation',
                         'filter_value' => 'verify',
+                        'allow_empty' => true,
                     ),
                     'register_activation_email' => array(
                         'name' => __( 'Activation Email Body', 'super-forms' ),
@@ -900,6 +907,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_activation',
                         'filter_value' => 'verify',
+                        'allow_empty' => true,
                     ),                                      
                     'register_login_user_meta' => array(
                         'name' => __( 'Save custom user meta', 'super-forms' ),
@@ -909,6 +917,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'register',
+                        'allow_empty' => true,
                     ),
 
                     'register_login_multisite_enabled' => array(
@@ -928,7 +937,8 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_domain', $settings['settings'], '{user_email}' ),
                         'filter' => true,
                         'parent' => 'register_login_multisite_enabled',
-                        'filter_value' => 'true'
+                        'filter_value' => 'true',
+                        'allow_empty' => true,
                     ),
                     'register_login_multisite_path' => array(
                         'name' => __( 'Path to the blog', 'super-forms' ),
@@ -936,7 +946,8 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_path', $settings['settings'], '{user_email}' ),
                         'filter' => true,
                         'parent' => 'register_login_multisite_enabled',
-                        'filter_value' => 'true'
+                        'filter_value' => 'true',
+                        'allow_empty' => true,
                     ),
                     'register_login_multisite_title' => array(
                         'name' => __( 'Title for blog', 'super-forms' ),
@@ -944,7 +955,8 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_title', $settings['settings'], '{user_email}' ),
                         'filter' => true,
                         'parent' => 'register_login_multisite_enabled',
-                        'filter_value' => 'true'
+                        'filter_value' => 'true',
+                        'allow_empty' => true,
                     ),
                     'register_login_multisite_id' => array(
                         'name' => __( 'Site ID, if running multiple networks', 'super-forms' ),
@@ -952,7 +964,8 @@ if(!class_exists('SUPER_Register_Login')) :
                         'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_id', $settings['settings'], '1' ),
                         'filter' => true,
                         'parent' => 'register_login_multisite_enabled',
-                        'filter_value' => 'true'
+                        'filter_value' => 'true',
+                        'allow_empty' => true,
                     ),
                     'register_login_multisite_email' => array(
                         'default' => SUPER_Settings::get_value( 0, 'register_login_multisite_email', $settings['settings'], 'true' ),
@@ -962,7 +975,8 @@ if(!class_exists('SUPER_Register_Login')) :
                         ),
                         'filter' => true,
                         'parent' => 'register_login_multisite_enabled',
-                        'filter_value' => 'true'
+                        'filter_value' => 'true',
+                        'allow_empty' => true,
                     ),
 
                     'register_reset_password_success_msg' => array(
@@ -972,6 +986,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'reset_password',
+                        'allow_empty' => true,
                     ),
                     'register_reset_password_not_exists_msg' => array(
                         'name' => __( 'Not found message', 'super-forms' ),
@@ -980,6 +995,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'reset_password',
+                        'allow_empty' => true,
                     ),
                     'register_reset_password_subject' => array(
                         'name' => __( 'Lost Password Email Subject', 'super-forms' ),
@@ -988,6 +1004,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'reset_password',
+                        'allow_empty' => true,
                     ),
                     'register_reset_password_email' => array(
                         'name' => __( 'Lost Password Email Body', 'super-forms' ),
@@ -997,6 +1014,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'reset_password',
+                        'allow_empty' => true,
                     ),
 
                     // @since 1.2.0 - not logged in user for when we are updating user data
@@ -1008,6 +1026,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'update',
+                        'allow_empty' => true,
                     ),
                     'register_login_update_user_meta' => array(
                         'name' => __( 'Update custom user meta', 'super-forms' ),
@@ -1018,6 +1037,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'update',
+                        'allow_empty' => true,
                     ),
                 )
             );
