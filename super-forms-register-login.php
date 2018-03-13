@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.5.1
+ * Version:     1.5.2
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.5.1';
+        public $version = '1.5.2';
 
 
         /**
@@ -911,9 +911,9 @@ if(!class_exists('SUPER_Register_Login')) :
                     ),                                      
                     'register_login_user_meta' => array(
                         'name' => __( 'Save custom user meta', 'super-forms' ),
-                        'desc' => __( 'Usefull for external plugins such as WooCommerce. Example: \'field_name|meta_key\' (each on a new line)', 'super-forms' ),
+                        'label' => __( 'Usefull for external plugins such as WooCommerce. Example: \'field_name|meta_key\' (each on a new line)', 'super-forms' ),
                         'type' => 'textarea',
-                        'default' => SUPER_Settings::get_value( 0, 'register_login_user_meta', $settings['settings'], "billing_first_name|billing_first_name\nbilling_last_name|billing_last_name\nbilling_company|billing_company\nbilling_address_1|billing_address_1\nbilling_address_2|billing_address_2\nbilling_city|billing_city\nbilling_postcode|billing_postcode\nbilling_country|billing_country\nbilling_state|billing_state\nbilling_phone|billing_phone\nbilling_email|billing_email\nshipping_first_name|shipping_first_name\nshipping_last_name|shipping_last_name\nshipping_company|shipping_company\nshipping_address_1|shipping_address_1\nshipping_address_2|shipping_address_2\nshipping_city|shipping_city\nshipping_postcode|shipping_postcode\nshipping_country|shipping_country\nshipping_state|shipping_state" ),
+                        'placeholder' => SUPER_Settings::get_value( 0, 'register_login_user_meta', $settings['settings'], "field_name|meta_key\nbilling_first_name|billing_first_name\nbilling_last_name|billing_last_name\nbilling_company|billing_company\nbilling_address_1|billing_address_1\nbilling_address_2|billing_address_2\nbilling_city|billing_city\nbilling_postcode|billing_postcode\nbilling_country|billing_country\nbilling_state|billing_state\nbilling_phone|billing_phone\nbilling_email|billing_email\nshipping_first_name|shipping_first_name\nshipping_last_name|shipping_last_name\nshipping_company|shipping_company\nshipping_address_1|shipping_address_1\nshipping_address_2|shipping_address_2\nshipping_city|shipping_city\nshipping_postcode|shipping_postcode\nshipping_country|shipping_country\nshipping_state|shipping_state" ),
                         'filter' => true,
                         'parent' => 'register_login_action',
                         'filter_value' => 'register',
@@ -1176,48 +1176,50 @@ if(!class_exists('SUPER_Register_Login')) :
                                 $sql = "SELECT meta_key FROM {$wpdb->postmeta} WHERE meta_key LIKE 'field_%' AND meta_value LIKE '%\"name\";s:$length:\"$k\";%';";
                             }
                             $acf_field = $wpdb->get_var($sql);
-                            $acf_field = get_field_object($acf_field);
+                            if( $acf_field ) {
+                                $acf_field = get_field_object($acf_field);
 
-                            // @since 1.1.3 - save a checkbox or select value
-                            if( ($acf_field['type']=='checkbox') || ($acf_field['type']=='select') || ($acf_field['type']=='radio') || ($acf_field['type']=='gallery') ) {
-                                $value = explode( ",", $v );
-                                update_field( $acf_field['key'], $value, 'user_'.$user_id );
-                                continue;
-                            }elseif( $acf_field['type']=='google_map' ) {
-                                if( isset($data[$k]['geometry']) ) {
-                                    $data[$k]['geometry']['location']['address'] = $data[$k]['value'];
-                                    $value = $data[$k]['geometry']['location'];
-                                }else{
-                                    $value = array(
-                                        'address' => $data[$k]['value'],
-                                        'lat' => '',
-                                        'lng' => '',
-                                    );
+                                // @since 1.1.3 - save a checkbox or select value
+                                if( ($acf_field['type']=='checkbox') || ($acf_field['type']=='select') || ($acf_field['type']=='radio') || ($acf_field['type']=='gallery') ) {
+                                    $value = explode( ",", $v );
+                                    update_field( $acf_field['key'], $value, 'user_'.$user_id );
+                                    continue;
+                                }elseif( $acf_field['type']=='google_map' ) {
+                                    if( isset($data[$k]['geometry']) ) {
+                                        $data[$k]['geometry']['location']['address'] = $data[$k]['value'];
+                                        $value = $data[$k]['geometry']['location'];
+                                    }else{
+                                        $value = array(
+                                            'address' => $data[$k]['value'],
+                                            'lat' => '',
+                                            'lng' => '',
+                                        );
+                                    }
+                                    update_field( $acf_field['key'], $value, 'user_'.$user_id );
+                                    continue;
                                 }
-                                update_field( $acf_field['key'], $value, 'user_'.$user_id );
-                                continue;
-                            }
 
-                            // @since 1.1.3 - save a repeater field value
-                            if($acf_field['type']=='repeater'){
-                                $repeater_values = array();
-                                foreach($acf_field['sub_fields'] as $sk => $sv){
-                                    if( isset($data[$sv['name']]) ) {
-                                        $repeater_values[0][$sv['name']] = $this->return_field_value( $data, $sv['name'], $sv['type'], $settings );
-                                        $field_counter = 2;
-                                        while( isset($data[$sv['name'] . '_' . $field_counter]) ) {
-                                            $repeater_values[$field_counter-1][$sv['name']] = $this->return_field_value( $data, $sv['name'] . '_' . $field_counter, $sv['type'], $settings );
-                                            $field_counter++;
+                                // @since 1.1.3 - save a repeater field value
+                                if($acf_field['type']=='repeater'){
+                                    $repeater_values = array();
+                                    foreach($acf_field['sub_fields'] as $sk => $sv){
+                                        if( isset($data[$sv['name']]) ) {
+                                            $repeater_values[0][$sv['name']] = $this->return_field_value( $data, $sv['name'], $sv['type'], $settings );
+                                            $field_counter = 2;
+                                            while( isset($data[$sv['name'] . '_' . $field_counter]) ) {
+                                                $repeater_values[$field_counter-1][$sv['name']] = $this->return_field_value( $data, $sv['name'] . '_' . $field_counter, $sv['type'], $settings );
+                                                $field_counter++;
+                                            }
                                         }
                                     }
+                                    update_field( $acf_field['key'], $repeater_values, 'user_'.$user_id );
+                                    continue;
                                 }
-                                update_field( $acf_field['key'], $repeater_values, 'user_'.$user_id );
+
+                                // save a basic text value
+                                update_field( $acf_field['key'], $v, 'user_'.$user_id );
                                 continue;
                             }
-
-                            // save a basic text value
-                            update_field( $acf_field['key'], $v, 'user_'.$user_id );
-                            continue;
 
                         }
                         update_user_meta( $user_id, $k, $v ); 
