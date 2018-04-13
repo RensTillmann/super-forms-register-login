@@ -1,3 +1,6 @@
+Apr 13, 2018 - Version 1.5.3
+- Fix: "Save custom user meta" placeholder and default value mixed up, causing it to not save the setting when saving form the next time the builder page was reloaded
+
 Mar 13, 2018 - Version 1.5.2
 - Fix: Bug in combination with ACF plugin, not saving other meta data which did not exist in ACF as meta field
 
