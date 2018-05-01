@@ -1505,7 +1505,7 @@ if(!class_exists('SUPER_Register_Login')) :
             if( $settings['register_login_action']=='login' ) {
 
                 // Before we proceed, lets check if we have at least a user_login or user_email and user_pass field
-                if( ( !isset( $data['user_login'] ) ) && ( !isset( $data['user_pass'] ) ) ) {
+                if( ( !isset( $data['user_login'] ) ) || ( !isset( $data['user_pass'] ) ) ) {
                     $msg = __( 'We couldn\'t find the <strong>user_login</strong> or <strong>user_pass</strong> fields which are required in order to login a new user. Please <a href="' . get_admin_url() . 'admin.php?page=super_create_form&id=' . absint( $atts['post']['form_id'] ) . '">edit</a> your form and try again', 'super-forms' );
                     SUPER_Common::output_error(
                         $error = true,
