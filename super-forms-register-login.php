@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.5.3
+ * Version:     1.5.4
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -482,6 +482,7 @@ if(!class_exists('SUPER_Register_Login')) :
                             }
 
                             // Send the email
+                            $message = apply_filters( 'super_before_sending_email_body_filter', $message, array( 'settings'=>$settings, 'email_loop'=>'', 'data'=>$data ) );
                             $mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
                          
                             // After email is send, delete the email and subject (remove the password from database for security reasons)
@@ -1436,6 +1437,7 @@ if(!class_exists('SUPER_Register_Login')) :
                         }
 
                         // Send the email
+                        $message = apply_filters( 'super_before_sending_email_body_filter', $message, array( 'settings'=>$settings, 'email_loop'=>'', 'data'=>$data ) );
                         $mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
 
                         // Return message
@@ -1678,6 +1680,10 @@ if(!class_exists('SUPER_Register_Login')) :
                 $subject = SUPER_Common::email_tags( $settings['register_reset_password_subject'], $data, $settings, $user );
 
                 // Replace the email body tags with the correct data
+
+
+
+
                 $message = $settings['register_reset_password_email'];
                 $message = str_replace( '{register_login_url}', $settings['register_login_url'], $message );
                 $message = str_replace( '{register_generated_password}', $password, $message );
@@ -1702,6 +1708,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 }
 
                 // Send the email
+                $message = apply_filters( 'super_before_sending_email_body_filter', $message, array( 'settings'=>$settings, 'email_loop'=>'', 'data'=>$data ) );
                 $mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
 
                 // Return message
@@ -1777,6 +1784,7 @@ if(!class_exists('SUPER_Register_Login')) :
                 }
 
                 // Send the email
+                $message = apply_filters( 'super_before_sending_email_body_filter', $message, array( 'settings'=>$settings, 'email_loop'=>'', 'data'=>$data ) );
                 $mail = SUPER_Common::email( $user_email, $from, $from_name, $custom_reply, $reply, $reply_name, '', '', $subject, $message, $settings, $attachments );
 
                 // Return message

@@ -1,3 +1,6 @@
+May 10, 2018 - Version 1.5.4
+- Added: Compatability with Super Forms - E-mail Templates Add-on
+
 Apr 13, 2018 - Version 1.5.3
 - Fix: "Save custom user meta" placeholder and default value mixed up, causing it to not save the setting when saving form the next time the builder page was reloaded
 
