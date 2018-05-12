@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.5.3';
+        public $version = '1.5.4';
 
 
         /**
