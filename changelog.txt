@@ -1,3 +1,6 @@
+Jul 18, 2018 - Version 1.5.5
+- Fix: type on form setting `register_login_send_activation_email` had to be `register_send_approve_email`
+
 May 10, 2018 - Version 1.5.4
 - Added: Compatability with Super Forms - E-mail Templates Add-on
 

@@ -11,7 +11,7 @@
  * Plugin Name: Super Forms - Register & Login
  * Plugin URI:  http://codecanyon.net/item/super-forms-drag-drop-form-builder/13979866
  * Description: Makes it possible to let users register and login from the front-end
- * Version:     1.5.4
+ * Version:     1.5.5
  * Author:      feeling4design
  * Author URI:  http://codecanyon.net/user/feeling4design
 */
@@ -37,7 +37,7 @@ if(!class_exists('SUPER_Register_Login')) :
          *
          *  @since      1.0.0
         */
-        public $version = '1.5.4';
+        public $version = '1.5.5';
 
 
         /**
@@ -795,7 +795,7 @@ if(!class_exists('SUPER_Register_Login')) :
                     // @since 1.2.7 - Send activation email when account is activated by admin
                     'register_send_approve_email' => array(
                         'desc' => __( 'When admin approves registration this email will be send to the user', 'super-forms' ),
-                        'default' => SUPER_Settings::get_value( 0, 'register_login_send_activation_email', $settings['settings'], '' ),
+                        'default' => SUPER_Settings::get_value( 0, 'register_send_approve_email', $settings['settings'], '' ),
                         'type' => 'checkbox',
                         'values' => array(
                             'true' => __( 'Send approve email when account is activated by admin', 'super-forms' ),
